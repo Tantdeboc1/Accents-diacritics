@@ -18,20 +18,12 @@ st.caption("Consulta definicions, exemples i parelles amb/sense accent")
 # ===========================
 # Utilidades
 # ===========================
-def strip_accents(s: str) -> str:
-    """Quita acentos y baja a minúsculas para búsquedas tolerantes."""
-    s = (s or "").strip().lower()
-    s = unicodedata.normalize("NFD", s)
-    return "".join(ch for ch in s if unicodedata.category(ch) != "Mn")
 
-def search_suggestions(prefix: str):
-    """Sugerencias por inicial (con o sin acentos, según ajuste)."""
-    if st.session_state.get("buscar_sin_acentos"):
-        inicial = strip_accents(prefix)[:1]
-        return sorted([w for w in monosilabos if strip_accents(w).startswith(inicial)])
-    else:
-        inicial = prefix.strip().lower()[:1]
-        return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
+
+def search_suggestions(prefix: str:
+     """Sugerencias por inicial (sin quitar acentos)."""
+     inicial = prefix.strip().lower()[:1]
+     return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
 
 def display_word_info(paraula: str):
     """Muestra la paraula, la categoria, la definició, exemples y el contrast."""
@@ -400,16 +392,12 @@ for acent, sense in pares:
     parelles[acent] = sense
     parelles[sense] = acent
 
-# Índice normalizado para búsquedas sin acentos (se construye una vez)
-index_norm = {strip_accents(k): k for k in monosilabos.keys()}
-
 # ===========================
 # Estado de sesión
 # ===========================
 if "historial" not in st.session_state:
     st.session_state.historial = []
-if "buscar_sin_acentos" not in st.session_state:
-    st.session_state.buscar_sin_acentos = True  # activado por defecto
+
 
 # ===========================
 # Barra lateral (menú)
@@ -422,8 +410,7 @@ with st.sidebar:
         index=0
     )
     st.divider()
-    st.checkbox("Buscar sense accents (recomanat)", value=True, key="buscar_sin_acentos")
-    st.caption("Ex.: escriu «mes» i trobarà «més».")
+
 
 # ===========================
 # Vistas
@@ -436,11 +423,9 @@ if opcio == "🔍 Buscar paraula":
     )
 
     if paraula_input:
-        # Normalización opcional
-        if st.session_state.buscar_sin_acentos:
-            key = index_norm.get(strip_accents(paraula_input))
-        else:
-            key = paraula_input.strip().lower() if paraula_input.strip().lower() in monosilabos else None
+        
+        p = paraula_input.strip().lower()
+        key = p if p in monosilabos else None
 
         if key:
             # Añadir al historial (evita duplicados consecutivos)
@@ -576,6 +561,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
