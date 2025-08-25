@@ -56,7 +56,7 @@ def display_word_info(paraula: str):
         st.write(f"- {ex}")
 
     # Bloc per copiar: definició + exemples mostrats
-    bloc = f"{paraula.upper()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
+    bloc = f"{paraula}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
     st.code(bloc)
     st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l")
 
@@ -69,7 +69,7 @@ def display_word_info(paraula: str):
             st.write("**Categoria:**", info2.get("categoria", "—"))
             st.write("**Definició:**", info2["definicion"])
 
-            # Exemples (2 aleatoris) de la parella  ⬇️  (ojo a la indentació)
+            # Exemples (2 aleatoris) de la parella
             st.write("**Exemples:**")
             ej2 = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
             for ex in ej2:
@@ -592,6 +592,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
