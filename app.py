@@ -13,7 +13,11 @@ st.set_page_config(
     page_icon="📘",
     layout="centered",
 )
-
+st.markdown("""
+<style>
+.block-container { padding-bottom: 2rem !important; }
+</style>
+""", unsafe_allow_html=True)
 st.title("📘 Monosíl·labs: accents diacrítics en valencià")
 st.caption("Consulta definicions, exemples i parelles")
 
@@ -605,7 +609,20 @@ elif opcio == "📝 Mini-quiz":
                     )
 
             st.divider()
+with st.expander("Diagnòstic GitHub", expanded=False):
+    has_token = "GITHUB_TOKEN" in st.secrets
+    has_repo  = "GITHUB_REPO" in st.secrets
+    st.write("Token present:", "✅" if has_token else "❌")
+    st.write("Repo configurat:", "✅" if has_repo else "❌")
 
+    if st.button("🔧 Prova guardat a GitHub", key="btn_test_github"):
+        from datetime import datetime
+        rec = {"nom":"TEST","puntuacio":1,"total":1,"data":datetime.now().strftime("%Y-%m-%d %H:%M")}
+        if "append_score_to_github" not in globals():
+            st.error("No trobe append_score_to_github(). Has pegat els helpers?")
+        else:
+            ok = append_score_to_github(rec)
+            st.success("OK! S'ha creat/actualitzat scores.jsonl.") if ok else st.error("No s'ha pogut escriure. Mira Logs.")
             # -------- Rànquing estil arcade --------
             st.subheader("🏆 Rànquing (estil arcade)")
             col_nom, col_guardar = st.columns([2, 1])
@@ -616,37 +633,47 @@ elif opcio == "📝 Mini-quiz":
                     placeholder="p.ex. JOSEP",
                     help="Nom curt per a la classificació. 1–5 lletres (A–Z)."
                 )
-            with col_guardar:
-                from datetime import datetime
-                if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
-                    nom_clean = (nom_input or "").strip().upper()
-                    import re
-                    if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
-                        st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
-                    else:
-                        record = {
-                            "nom": nom_clean,
-                            "puntuacio": correctes,
-                            "total": total,
-                            "data": datetime.now().strftime("%Y-%m-%d %H:%M")
-                        }
-                        # 1) Desa en memòria de sessió
-                        st.session_state.scores.append(record)
+with col_guardar:
+    from datetime import datetime
+    if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
+        nom_clean = (nom_input or "").strip().upper()
+        import re
+        if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
+            st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
+        else:
+            record = {
+                "nom": nom_clean,
+                "puntuacio": correctes,
+                "total": total,
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M")
+            }
 
-                        # 2) (Opcional) si tens integrat guardat a GitHub:
-                        if "append_score_to_github" in globals():
-                            try:
-                                ok = append_score_to_github(record)
-                                if ok:
-                                    st.success("Puntuació guardada al rànquing (persistència a GitHub)!")
-                                else:
-                                    st.warning("S'ha guardat en memòria, però no a GitHub.")
-                            except Exception as e:
-                                st.warning("No s'ha pogut guardar a GitHub; guardada en memòria.")
-                        else:
-                            st.info("Guardada en memòria. (Pots activar persistència a GitHub més endavant.)")
+            # Firma anti-duplicats
+            sig = f"{record['nom']}-{record['puntuacio']}-{record['total']}"
+            if "last_score_sig" not in st.session_state:
+                st.session_state.last_score_sig = None
+            if st.session_state.last_score_sig == sig:
+                st.info("Ja has guardat este mateix resultat.")
+            else:
+                st.session_state.last_score_sig = sig
+                # marca optimista per evitar doble clics
+                quiz["guardat"] = True
 
-                        quiz["guardat"] = True
+                # guarda en memòria
+                st.session_state.scores.append(record)
+
+                # i persistència remota si existeixen helpers
+                ok = True
+                if "append_score_to_github" in globals():
+                    try:
+                        ok = append_score_to_github(record)
+                    except Exception:
+                        ok = False
+
+                if ok:
+                    st.success("Puntuació guardada al rànquing!")
+                else:
+                    st.warning("S'ha guardat en memòria, però no a GitHub (torna-ho a intentar).")
 
             # -------- Mostrar rànquing (Top 10) --------
             # Si tens lectura remota de GitHub, pots combinar:
@@ -708,6 +735,7 @@ elif opcio == "📝 Mini-quiz":
                             "terminado": False,
                             "guardat": False
                         }
+
 
 
 
