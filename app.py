@@ -20,7 +20,7 @@ st.caption("Consulta definicions, exemples i parelles amb/sense accent")
 # ===========================
 
 
-def search_suggestions(prefix: str:
+def search_suggestions(prefix: str):
      """Sugerencias por inicial (sin quitar acentos)."""
      inicial = prefix.strip().lower()[:1]
      return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
@@ -561,6 +561,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
