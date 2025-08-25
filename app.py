@@ -416,7 +416,7 @@ if "buscar_sin_acentos" not in st.session_state:
 # ===========================
 with st.sidebar:
     st.header("Menú")
-    opcio = st.radio("Acció",["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
+    opcio = st.radio("Acció",["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"]),
     index=0
     st.divider()
     st.checkbox("Buscar sense accents (recomanat)", value=True, key="buscar_sin_acentos")
@@ -573,6 +573,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
