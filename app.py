@@ -90,109 +90,143 @@ def generar_preguntas(n=10):
 monosilabos = {
     "sí": {"categoria": "adverbi d'afirmació",
            "definicion": "Adverbi d’afirmació.",
-           "ejemplos": ["Sí, vindré demà.", "Va dir que sí a la proposta.", "Sí que ho sabia.", "I tant que sí!"]},
+           "ejemplos": [
+               "Sí, vindré demà.",
+               "Va dir que sí a la proposta.",
+               "Sí que ho sabia.",
+               "I tant que sí!",
+               "Sí, estic d’acord amb tu.",
+               "Sí, és veritat."
+           ]},
     "si": {"categoria": "conjunció condicional",
            "definicion": "Conjunció condicional.",
-           "ejemplos": ["Si plou, ens quedem a casa.", "Si estudies, aprovaràs.", "Si vols, t’ajude."]},
+           "ejemplos": [
+               "Si plou, ens quedem a casa.",
+               "Si estudies, aprovaràs.",
+               "Si vols, t’ajude.",
+               "Si tens temps, vine demà.",
+               "Si no ho proves, mai ho sabràs."
+           ]},
 
     "més": {"categoria": "quantificador/comparatiu",
             "definicion": "Comparatiu de quantitat (‘més = más’).",
-            "ejemplos": ["Vull més aigua.", "Açò és més car que allò.", "Necessitem més temps."]},
+            "ejemplos": [
+                "Vull més aigua.",
+                "Açò és més car que allò.",
+                "Necessitem més temps.",
+                "Cada dia estudie més hores.",
+                "Vol més cafè al matí.",
+                "Hi ha més gent a la plaça hui."
+            ]},
     "mes": {"categoria": "nom (mes del calendari)",
             "definicion": "Nom del calendari.",
-            "ejemplos": ["El mes de juny fa calor.", "Cada mes estalvie un poc.", "Aquest mes començarem."]},
+            "ejemplos": [
+                "El mes de juny fa calor.",
+                "Cada mes estalvie un poc.",
+                "Aquest mes començarem.",
+                "El pròxim mes hi haurà vacances.",
+                "És el mes més llarg de l’any."
+            ]},
 
     "bé": {"categoria": "adverbi",
            "definicion": "Adverbi (‘bé = bien’).",
-           "ejemplos": ["Estic bé, gràcies.", "Fes-ho bé, si us plau.", "No m’ha paregut bé."]},
+           "ejemplos": [
+               "Estic bé, gràcies.",
+               "Fes-ho bé, si us plau.",
+               "No m’ha paregut bé.",
+               "Treballa molt bé sota pressió.",
+               "Tot ha eixit bé al final."
+           ]},
     "be": {"categoria": "nom (animal jove)",
            "definicion": "Nom: ‘corder’, ‘ovella jove’.",
-           "ejemplos": ["Va comprar un be al mercat.", "El be pastura al camp.", "Han nascut dos bens."]},
+           "ejemplos": [
+               "Va comprar un be al mercat.",
+               "El be pastura al camp.",
+               "Han nascut dos bens.",
+               "El be balava sense parar.",
+               "El pastor cuidava un be malalt."
+           ]},
 
     "déu": {"categoria": "nom propi (entitat divina)",
             "definicion": "Nom: ‘déu = dios’.",
-            "ejemplos": ["Crec en un sol Déu.", "El Déu dels antics era venerat."]},
+            "ejemplos": [
+                "Crec en un sol Déu.",
+                "El Déu dels antics era venerat.",
+                "La gent resava al seu Déu.",
+                "Van construir un temple dedicat a Déu.",
+                "Déu és omnipotent segons la fe."
+            ]},
     "deu": {"categoria": "numeral / forma de ‘deure’",
             "definicion": "Nombre ‘deu = diez’ o forma de ‘deure’ (ha/han de).",
-            "ejemplos": ["En té deu cromos.", "Deu estudiar més per a aprovar.", "Deu ser tard."]},
+            "ejemplos": [
+                "En té deu cromos.",
+                "Deu estudiar més per a aprovar.",
+                "Deu ser tard.",
+                "Han arribat deu persones.",
+                "Deu treballar molt per aconseguir-ho."
+            ]},
 
     "és": {"categoria": "verb ‘ser’ (3a sing.)",
            "definicion": "Forma verbal del verb ‘ser’.",
-           "ejemplos": ["Ell és professor.", "La casa és gran.", "És evident."]},
+           "ejemplos": [
+               "Ell és professor.",
+               "La casa és gran.",
+               "És evident.",
+               "El llibre és interessant.",
+               "És massa tard per eixir.",
+               "És el meu millor amic."
+           ]},
     "es": {"categoria": "pronom",
            "definicion": "Pronom personal.",
-           "ejemplos": ["Es pentina cada matí.", "Es va caure al terra.", "Es mira al mirall."]},
+           "ejemplos": [
+               "Es pentina cada matí.",
+               "Es va caure al terra.",
+               "Es mira al mirall.",
+               "Es van saludar cordialment.",
+               "Es va vestir ràpidament."
+           ]},
 
     "mà": {"categoria": "nom (part del cos)",
            "definicion": "Part del cos (‘mà = mano’).",
-           "ejemplos": ["La mà em fa mal.", "Agafa’m de la mà.", "Dóna’m la mà."]},
+           "ejemplos": [
+               "La mà em fa mal.",
+               "Agafa’m de la mà.",
+               "Dóna’m la mà.",
+               "Alça la mà per preguntar.",
+               "Va escriure amb la mà esquerra."
+           ]},
     "ma": {"categoria": "adjectiu possessiu",
            "definicion": "Adjectiu possessiu (‘ma = mi’).",
-           "ejemplos": ["Ma casa és la teua.", "Ma mare treballa ací.", "Ma germana vindrà."]},
+           "ejemplos": [
+               "Ma casa és la teua.",
+               "Ma mare treballa ací.",
+               "Ma germana vindrà.",
+               "Ma terra és especial per a mi.",
+               "Ma família viu al poble."
+           ]},
 
     "món": {"categoria": "nom",
             "definicion": "‘Món = mundo’.",
-            "ejemplos": ["El món és gran.", "Viatjar pel món és enriquidor.", "És el meu món."]},
+            "ejemplos": [
+                "El món és gran.",
+                "Viatjar pel món és enriquidor.",
+                "És el meu món.",
+                "El món canvia ràpidament.",
+                "Tot el món ho sap."
+            ]},
     "mon": {"categoria": "possessiu arcaic",
             "definicion": "Possessiu arcaic (‘mon = mi’).",
-            "ejemplos": ["Mon pare treballa al camp.", "Mon oncle viu lluny."]},
+            "ejemplos": [
+                "Mon pare treballa al camp.",
+                "Mon oncle viu lluny.",
+                "Mon cosí és menut.",
+                "Mon avi sempre conta històries.",
+                "Mon germà juga al futbol."
+            ]},
 
     "pèl": {"categoria": "nom",
             "definicion": "‘Pèl = pelo, cabell’ (filament).",
-            "ejemplos": ["Tens un pèl al jersei.", "El gat ha deixat pèl al sofà.", "Se m’ha caigut un pèl."]},
-    "pel": {"categoria": "contracció (‘per el’)",
-            "definicion": "Contracció de ‘per el’.",
-            "ejemplos": ["Passe pel carrer major.", "Vaig pel camí antic.", "Mira pel finestral."]},
 
-    "què": {"categoria": "pronom interrogatiu/exclamatiu",
-            "definicion": "Pronom interrogatiu/exclamatiu.",
-            "ejemplos": ["Què vols menjar?", "Mira què ha passat!", "Què tal estàs?"]},
-    "que": {"categoria": "conjunció / pronom relatiu",
-            "definicion": "Conjunció o pronom relatiu.",
-            "ejemplos": ["Pensa que vindrà.", "El llibre que llegisc és interessant.", "Diuen que plourà."]},
-
-    "sé": {"categoria": "verb ‘saber’ (1a sing.)",
-           "definicion": "Forma verbal de ‘saber’.",
-           "ejemplos": ["Jo sé la resposta.", "No sé què dir-te.", "Sé que tens raó."]},
-    "se": {"categoria": "pronom",
-           "definicion": "Pronom personal.",
-           "ejemplos": ["Se’n va anar de pressa.", "Se sent feliç.", "Se’n recorda sovint."]},
-
-    "sòl": {"categoria": "nom (terra ferma/suelo)",
-            "definicion": "‘Sòl = suelo, terra ferma’.",
-            "ejemplos": ["El sòl està mullat.", "No poses això al sòl.", "El sòl és irregular."]},
-    "sol": {"categoria": "nom (astre) / adjectiu (‘sol = a soles’)",
-            "definicion": "Nom (astre ‘sol’) o adjectiu (‘sol = solo’).",
-            "ejemplos": ["El sol brilla.", "Estic sol a casa.", "Prefereix estar sol."]},
-
-    "són": {"categoria": "verb ‘ser’ (3a pl.)",
-            "definicion": "Forma verbal de ‘ser’ (3a persona plural).",
-            "ejemplos": ["Ells són amics.", "Les cases són grans.", "Són ben educats."]},
-    "son": {"categoria": "nom (somnolència)",
-            "definicion": "‘Son = sueño, ganes de dormir’.",
-            "ejemplos": ["Tinc son.", "El bebé té son.", "Em fa son llegir."]},
-
-    "té": {"categoria": "verb ‘tindre’ (3a sing.)",
-           "definicion": "Forma verbal de ‘tindre’.",
-           "ejemplos": ["Ella té un cotxe.", "El xic té gana.", "Té pressa."]},
-    "te": {"categoria": "pronom / nom (beguda)",
-           "definicion": "Pronom (‘a tu’) o beguda (‘te’).",
-           "ejemplos": ["Això és per a te.", "Vull un te calent.", "El te verd m’agrada."]},
-
-    "ús": {"categoria": "nom",
-           "definicion": "‘Ús = utilización’ d’alguna cosa.",
-           "ejemplos": ["L’ús del mòbil està regulat.", "Fa ús del diccionari.", "En limita l’ús."]},
-    "us": {"categoria": "pronom (a vosaltres)",
-           "definicion": "Pronom personal (‘a vosaltres’).",
-           "ejemplos": ["Us espere a la porta.", "Ja us he vist.", "Us ho explique després."]},
-
-    "vós": {"categoria": "pronom de cortesia",
-            "definicion": "Pronom personal de cortesia.",
-            "ejemplos": ["Vós sou benvingut.", "Com esteu, vós?", "Gràcies a vós."]},
-    "vos": {"categoria": "pronom (a vosaltres)",
-            "definicion": "Pronom personal (‘a vosaltres’).",
-            "ejemplos": ["Vos estime molt.", "Vos ajudaré en tot.", "Vos ho diré demà."]},
-}
 
 pares = [
     ("bé", "be"),
@@ -390,4 +424,5 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
