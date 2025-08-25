@@ -223,9 +223,158 @@ monosilabos = {
                 "Mon avi sempre conta històries.",
                 "Mon germà juga al futbol."
             ]},
-
-    "pèl": {"categoria": "nom",
+ "pèl": {"categoria": "nom",
             "definicion": "‘Pèl = pelo, cabell’ (filament).",
+            "ejemplos": [
+                "Tens un pèl al jersei.",
+                "El gat ha deixat pèl al sofà.",
+                "Se m’ha caigut un pèl.",
+                "El pèl és molt fi.",
+                "Els gossos muden el pèl a la primavera."
+            ]},
+    "pel": {"categoria": "contracció (‘per el’)",
+            "definicion": "Contracció de ‘per el’.",
+            "ejemplos": [
+                "Passe pel carrer major.",
+                "Vaig pel camí antic.",
+                "Mira pel finestral.",
+                "Corre pel passadís.",
+                "Busca pel calaix."
+            ]},
+
+    "què": {"categoria": "pronom interrogatiu/exclamatiu",
+            "definicion": "Pronom interrogatiu/exclamatiu.",
+            "ejemplos": [
+                "Què vols menjar?",
+                "Mira què ha passat!",
+                "Què tal estàs?",
+                "Què fas ací?",
+                "Què vols dir exactament?"
+            ]},
+    "que": {"categoria": "conjunció / pronom relatiu",
+            "definicion": "Conjunció o pronom relatiu.",
+            "ejemplos": [
+                "Pensa que vindrà.",
+                "El llibre que llegisc és interessant.",
+                "Diuen que plourà.",
+                "Crec que tens raó.",
+                "És el projecte que esperàvem."
+            ]},
+
+    "sé": {"categoria": "verb ‘saber’ (1a sing.)",
+           "definicion": "Forma verbal de ‘saber’.",
+           "ejemplos": [
+               "Jo sé la resposta.",
+               "No sé què dir-te.",
+               "Sé que tens raó.",
+               "No sé si vindrà.",
+               "Sé tocar la guitarra."
+           ]},
+    "se": {"categoria": "pronom",
+           "definicion": "Pronom personal.",
+           "ejemplos": [
+               "Se’n va anar de pressa.",
+               "Se sent feliç.",
+               "Se’n recorda sovint.",
+               "Se n’anà corrent.",
+               "Se sorprengué amb la notícia."
+           ]},
+
+    "sòl": {"categoria": "nom (terra ferma/suelo)",
+            "definicion": "‘Sòl = suelo, terra ferma’.",
+            "ejemplos": [
+                "El sòl està mullat.",
+                "No poses això al sòl.",
+                "El sòl és irregular.",
+                "El sòl de la cuina és nou.",
+                "El sòl forestal és ric en nutrients."
+            ]},
+    "sol": {"categoria": "nom (astre) / adjectiu (‘sol = a soles’)",
+            "definicion": "Nom (astre ‘sol’) o adjectiu (‘sol = solo’).",
+            "ejemplos": [
+                "El sol brilla.",
+                "Estic sol a casa.",
+                "Prefereix estar sol.",
+                "El sol escalfa la terra.",
+                "El sol es pon a l’oest."
+            ]},
+
+    "són": {"categoria": "verb ‘ser’ (3a pl.)",
+            "definicion": "Forma verbal de ‘ser’ (3a persona plural).",
+            "ejemplos": [
+                "Ells són amics.",
+                "Les cases són grans.",
+                "Són ben educats.",
+                "Els meus pares són mestres.",
+                "Són de València."
+            ]},
+    "son": {"categoria": "nom (somnolència)",
+            "definicion": "‘Son = sueño, ganes de dormir’.",
+            "ejemplos": [
+                "Tinc son.",
+                "El bebé té son.",
+                "Em fa son llegir.",
+                "Ell té molta son.",
+                "Després de dinar em ve son."
+            ]},
+
+    "té": {"categoria": "verb ‘tindre’ (3a sing.)",
+           "definicion": "Forma verbal de ‘tindre’.",
+           "ejemplos": [
+               "Ella té un cotxe.",
+               "El xic té gana.",
+               "Té pressa.",
+               "Té tres gats a casa.",
+               "Té molta sort."
+           ]},
+    "te": {"categoria": "pronom / nom (beguda)",
+           "definicion": "Pronom (‘a tu’) o beguda (‘te’).",
+           "ejemplos": [
+               "Això és per a te.",
+               "Vull un te calent.",
+               "El te verd m’agrada.",
+               "Beu un te amb llet.",
+               "Regala’m un te d’herbes."
+           ]},
+
+    "ús": {"categoria": "nom",
+           "definicion": "‘Ús = utilización’ d’alguna cosa.",
+           "ejemplos": [
+               "L’ús del mòbil està regulat.",
+               "Fa ús del diccionari.",
+               "En limita l’ús.",
+               "L’ús de plàstic ha disminuït.",
+               "Estudia l’ús correcte dels verbs."
+           ]},
+    "us": {"categoria": "pronom (a vosaltres)",
+           "definicion": "Pronom personal (‘a vosaltres’).",
+           "ejemplos": [
+               "Us espere a la porta.",
+               "Ja us he vist.",
+               "Us ho explique després.",
+               "Us recomane aquest llibre.",
+               "Us vaig telefonar ahir."
+           ]},
+
+    "vós": {"categoria": "pronom de cortesia",
+            "definicion": "Pronom personal de cortesia.",
+            "ejemplos": [
+                "Vós sou benvingut.",
+                "Com esteu, vós?",
+                "Gràcies a vós.",
+                "Vós teniu la paraula.",
+                "Vós sereu recordat sempre."
+            ]},
+    "vos": {"categoria": "pronom (a vosaltres)",
+            "definicion": "Pronom personal (‘a vosaltres’).",
+            "ejemplos": [
+                "Vos estime molt.",
+                "Vos ajudaré en tot.",
+                "Vos ho diré demà.",
+                "Vos vaig veure ahir.",
+                "Vos vaig escriure un missatge."
+            ]},
+}
 
 
 pares = [
@@ -424,5 +573,6 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
