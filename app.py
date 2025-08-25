@@ -446,12 +446,12 @@ if opcio == "🔍 Buscar paraula":
 
       else:
         st.warning("No està en la base de dades. Revisa l'accent.")
-    # Mostrar pistes amb colors
+        # Mostrar pistes amb colors
         sugerides = search_suggestions(paraula_input)
         if sugerides:
-        st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
+            st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
         else:
-        st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
+            st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
 
 
 elif opcio == "📃 Llista":
@@ -572,6 +572,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
