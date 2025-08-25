@@ -223,7 +223,7 @@ monosilabos = {
                 "Mon avi sempre conta històries.",
                 "Mon germà juga al futbol."
             ]},
- "pèl": {"categoria": "nom",
+  "pèl": {"categoria": "nom",
             "definicion": "‘Pèl = pelo, cabell’ (filament).",
             "ejemplos": [
                 "Tens un pèl al jersei.",
@@ -416,8 +416,11 @@ if "buscar_sin_acentos" not in st.session_state:
 # ===========================
 with st.sidebar:
     st.header("Menú")
-    opcio = st.radio("Acció",["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"]),
-    index=0
+    opcio = st.radio(
+        "Acció",
+        ["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
+        index=0
+    )
     st.divider()
     st.checkbox("Buscar sense accents (recomanat)", value=True, key="buscar_sin_acentos")
     st.caption("Ex.: escriu «mes» i trobarà «més».")
@@ -573,6 +576,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
