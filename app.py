@@ -56,7 +56,7 @@ def display_word_info(paraula: str):
         st.write(f"- {ex}")
 
     # Bloc per copiar: definició + exemples mostrats
-    bloc = f"{paraula}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
+    bloc = f"{paraula.capitalize()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
     st.code(bloc)
     st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l")
 
@@ -74,6 +74,12 @@ def display_word_info(paraula: str):
             ej2 = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
             for ex in ej2:
                 st.write(f"- {ex}")
+
+            # Bloc per copiar de la paraula contrast
+            bloc2 = f"{altra.capitalize()}\n{info2['definicion']}\n" + "\n".join(f"- {e}" for e in ej2)
+            st.code(bloc2)
+            st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l", key=f"copy_{altra}")
+
 
 def make_cloze(sentence: str, word: str) -> str:
     """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
@@ -592,6 +598,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
