@@ -113,6 +113,92 @@ def generar_preguntas(n=10):
             break
     return preguntas
 
+# ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
+import json, base64, requests, time
+
+def _gh_headers():
+    import streamlit as st
+    return {
+        "Authorization": f"Bearer {st.secrets['GITHUB_TOKEN']}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+def _gh_file_url():
+    import streamlit as st
+    owner_repo = st.secrets["GITHUB_REPO"]
+    branch = st.secrets.get("GITHUB_BRANCH", "main")
+    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
+    return f"https://api.github.com/repos/{owner_repo}/contents/{path}?ref={branch}"
+
+def _gh_put_url():
+    import streamlit as st
+    owner_repo = st.secrets["GITHUB_REPO"]
+    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
+    return f"https://api.github.com/repos/{owner_repo}/contents/{path}"
+
+def load_scores_from_github():
+    """Llig el JSONL del repo. Torna (scores:list, sha:str|None). Si no existeix, ([], None)."""
+    import streamlit as st
+    try:
+        r = requests.get(_gh_file_url(), headers=_gh_headers(), timeout=10)
+        if r.status_code == 404:
+            return [], None  # fitxer no creat encara
+        r.raise_for_status()
+        data = r.json()
+        content_b64 = data["content"]
+        sha = data["sha"]
+        content = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
+        scores = []
+        for line in content.splitlines():
+            if line.strip():
+                scores.append(json.loads(line))
+        return scores, sha
+    except Exception as e:
+        st = __import__("streamlit")
+        st.error(f"Error llegint rànquing de GitHub: {e}")
+        return [], None
+
+def append_score_to_github(record: dict, max_retries=3):
+    """
+    Afig un registre al JSONL en GitHub amb control de conflictes.
+    Flux:
+      - GET: llegir contingut i sha
+      - APPEND: afegir línia
+      - PUT: pujar amb sha
+    """
+    import streamlit as st
+    for attempt in range(max_retries):
+        scores, sha = load_scores_from_github()
+        lines = [json.dumps(s, ensure_ascii=False) for s in scores]
+        lines.append(json.dumps(record, ensure_ascii=False))
+        new_content = "\n".join(lines) + "\n"
+
+        payload = {
+            "message": f"Add score: {record.get('nom','???')} {record.get('puntuacio','?')}/{record.get('total','?')}",
+            "content": base64.b64encode(new_content.encode("utf-8")).decode("utf-8"),
+            "branch": st.secrets.get("GITHUB_BRANCH", "main"),
+        }
+        if sha:
+            payload["sha"] = sha
+
+        try:
+            r = requests.put(_gh_put_url(), headers=_gh_headers(), json=payload, timeout=15)
+            if r.status_code in (200, 201):
+                return True
+            if r.status_code == 409:  # conflicte: el fitxer ha canviat; reintentar
+                time.sleep(0.8)
+                continue
+            r.raise_for_status()
+            return True
+        except Exception as e:
+            if attempt == max_retries - 1:
+                st.error(f"No s'ha pogut guardar al rànquing (GitHub): {e}")
+                return False
+            time.sleep(0.8)
+    return False
+# ==== (fi helpers GitHub) ====
+
 # ===========================
 # Dades (els 15 monosíl·labs)
 # ===========================
@@ -735,6 +821,7 @@ with col_guardar:
                             "terminado": False,
                             "guardat": False
                         }
+
 
 
 
