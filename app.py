@@ -520,34 +520,43 @@ elif opcio == "🕘 Historial":
 elif opcio == "📝 Mini-quiz":
     st.header("Mini-quiz: tria la forma correcta")
 
-    # Selector de número de preguntes
-    col_sel, col_btn = st.columns([1,1])
+    # -------- Estado inicial necesario --------
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = None
+    if "quiz_n" not in st.session_state:
+        st.session_state.quiz_n = 10  # valor por defecte
+    if "scores" not in st.session_state:
+        st.session_state.scores = []  # {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
+
+    # -------- Selector nº de preguntes + botón nuevo quiz --------
+    col_sel, col_btn = st.columns([1, 1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
             "Nombre de preguntes",
             options=[5, 10, 20],
-            index=[5,10,20].index(st.session_state.get("quiz_n", 10)),
+            index=[5, 10, 20].index(st.session_state.get("quiz_n", 10)),
             help="Tria quantes preguntes vols per al quiz."
         )
     with col_btn:
-        if st.button(f"🔁 Nou quiz ({st.session_state.quiz_n} preguntes)"):
+        if st.button(f"🔁 Nou quiz ({st.session_state.quiz_n} preguntes)", key="btn_new_quiz_top"):
             preg = generar_preguntas(st.session_state.quiz_n)
             if not preg:
                 st.error("No s'han pogut generar preguntes. Revisa que els exemples continguen la paraula exacta.")
             else:
                 st.session_state.quiz = {
                     "preguntas": preg,
-                    "respuestas": [None]*len(preg),
+                    "respuestas": [None] * len(preg),
                     "terminado": False,
-                    "guardat": False  # marquem si s'ha guardat al rànquing
+                    "guardat": False
                 }
 
     quiz = st.session_state.get("quiz")
 
+    # -------- Si no hi ha quiz, indicació --------
     if not quiz:
         st.info("Prem **Nou quiz** per a començar.")
     else:
-        # Render de preguntes (dropdown amb 2 opcions)
+        # -------- Render de preguntes (2 opcions en desplegable) --------
         for i, q in enumerate(quiz["preguntas"]):
             st.markdown(f"**{i+1}.** {q['enunciado']}")
             seleccion = st.selectbox(
@@ -559,12 +568,12 @@ elif opcio == "📝 Mini-quiz":
             quiz["respuestas"][i] = seleccion if seleccion != "—" else None
             st.write("")
 
-        # Botó d'enviament
+        # -------- Botó d'enviament --------
         if not quiz["terminado"]:
-            if st.button("✅ Enviar respostes"):
+            if st.button("✅ Enviar respostes", key="btn_submit_quiz"):
                 quiz["terminado"] = True
 
-        # Correcció i feedback
+        # -------- Correcció i feedback --------
         if quiz["terminado"]:
             contestades = sum(1 for r in quiz["respuestas"] if r is not None)
             if contestades < len(quiz["preguntas"]):
@@ -597,164 +606,109 @@ elif opcio == "📝 Mini-quiz":
 
             st.divider()
 
-            # ——— Estil Arcade: guardar al rànquing ———
+            # -------- Rànquing estil arcade --------
             st.subheader("🏆 Rànquing (estil arcade)")
-            col_nom, col_guardar = st.columns([2,1])
+            col_nom, col_guardar = st.columns([2, 1])
             with col_nom:
                 nom_input = st.text_input(
                     "Escriu el teu nom (5 lletres màx.)",
                     max_chars=5,
                     placeholder="p.ex. JOSEP",
-                    help="Nom curt per a la classificació. Es guardaran només 5 caràcters."
+                    help="Nom curt per a la classificació. 1–5 lletres (A–Z)."
                 )
             with col_guardar:
                 from datetime import datetime
-                if st.button("💾 Guardar puntuació", disabled=quiz.get("guardat", False)):
+                if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
                     nom_clean = (nom_input or "").strip().upper()
-                    # Validació: 1–5 lletres (A-Z, incloent accents si vols; ací limitem a A–Z sense espais)
                     import re
                     if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
                         st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
                     else:
-                        st.session_state.scores.append({
+                        record = {
                             "nom": nom_clean,
                             "puntuacio": correctes,
                             "total": total,
                             "data": datetime.now().strftime("%Y-%m-%d %H:%M")
-                        })
-                        quiz["guardat"] = True
-                        st.success("Puntuació guardada al rànquing!")
+                        }
+                        # 1) Desa en memòria de sessió
+                        st.session_state.scores.append(record)
 
-            # Mostrar rànquing (ordenat per puntuació desc., després data desc.)
-            if st.session_state.scores:
-                # Ordenem: millor puntuació primer; a igual, la més recent
+                        # 2) (Opcional) si tens integrat guardat a GitHub:
+                        if "append_score_to_github" in globals():
+                            try:
+                                ok = append_score_to_github(record)
+                                if ok:
+                                    st.success("Puntuació guardada al rànquing (persistència a GitHub)!")
+                                else:
+                                    st.warning("S'ha guardat en memòria, però no a GitHub.")
+                            except Exception as e:
+                                st.warning("No s'ha pogut guardar a GitHub; guardada en memòria.")
+                        else:
+                            st.info("Guardada en memòria. (Pots activar persistència a GitHub més endavant.)")
+
+                        quiz["guardat"] = True
+
+            # -------- Mostrar rànquing (Top 10) --------
+            # Si tens lectura remota de GitHub, pots combinar:
+            scores_all = st.session_state.scores[:]  # bàsic: només memòria
+            # (Opcional) carregar del repo si tens load_scores_from_github():
+            if "load_scores_from_github" in globals():
+                try:
+                    scores_remote, _ = load_scores_from_github()
+                    # barreja senzill: afegeix locals que no estiguen al remot
+                    for s in scores_remote:
+                        if s not in scores_all:
+                            scores_all.append(s)
+                except Exception:
+                    pass
+
+            if scores_all:
                 scores_sorted = sorted(
-                    st.session_state.scores,
+                    scores_all,
                     key=lambda x: (x["puntuacio"], x["data"]),
                     reverse=True
                 )
 
-                # Top 10
                 st.markdown("**Top 10**")
                 for idx, s in enumerate(scores_sorted[:10], start=1):
                     barra = "█" * max(1, int(10 * s["puntuacio"] / s["total"]))
                     st.write(f"{idx:>2}. {s['nom']} — {s['puntuacio']}/{s['total']}  ({s['data']})  {barra}")
 
-                # Descarregar CSV
+                # Descarrega CSV del rànquing actual
                 import io, csv
                 buf = io.StringIO()
                 w = csv.writer(buf)
-                w.writerow(["posicio","nom","puntuacio","total","data"])
+                w.writerow(["posicio", "nom", "puntuacio", "total", "data"])
                 for idx, s in enumerate(scores_sorted, start=1):
                     w.writerow([idx, s["nom"], s["puntuacio"], s["total"], s["data"]])
                 st.download_button(
                     "⬇️ Descarregar rànquing (CSV)",
                     buf.getvalue().encode("utf-8"),
                     file_name="ranquing_quiz.csv",
-                    mime="text/csv"
+                    mime="text/csv",
+                    key="btn_download_scores"
                 )
 
             st.divider()
+
+            # -------- Botons finals --------
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🔁 Repetir (mateix quiz)"):
+                if st.button("🔁 Repetir (mateix quiz)", key="btn_repeat_same"):
                     quiz["terminado"] = False
             with col2:
-                if st.button("🆕 Nou quiz diferent"):
+                if st.button("🆕 Nou quiz diferent", key="btn_new_quiz_diff"):
                     preg = generar_preguntas(st.session_state.quiz_n)
                     if not preg:
                         st.error("No s'han pogut generar preguntes noves.")
                     else:
                         st.session_state.quiz = {
                             "preguntas": preg,
-                            "respuestas": [None]*len(preg),
+                            "respuestas": [None] * len(preg),
                             "terminado": False,
                             "guardat": False
                         }
 
-
-    colA, colB = st.columns(2)
-    with colA:
-        if st.button("🔁 Nou quiz (10 preguntes)"):
-            preg = generar_preguntas(10)
-            if not preg:
-                st.error("No s'han pogut generar preguntes. Revisa que els exemples continguen la paraula exacta.")
-            else:
-                st.session_state.quiz = {
-                    "preguntas": preg,
-                    "respuestas": [None]*len(preg),
-                    "terminado": False
-                }
-
-    with colB:
-        if st.session_state.get("quiz") and not st.session_state["quiz"]["terminado"]:
-            if st.button("✅ Enviar respostes"):
-                st.session_state["quiz"]["terminado"] = True
-
-    quiz = st.session_state.get("quiz")
-
-    if not quiz:
-        st.info("Prem **Nou quiz** per a començar.")
-    else:
-        # Render de les preguntes
-        for i, q in enumerate(quiz["preguntas"]):
-            st.markdown(f"**{i+1}.** {q['enunciado']}")
-            # Desplegable amb dues opcions (dropdown)
-            seleccion = st.selectbox(
-                f"Tria la forma correcta ({i+1})",
-                options=["—"] + q["opciones"],   # “—” = sense contestar
-                index=(["—"] + q["opciones"]).index(quiz["respuestas"][i]) if quiz["respuestas"][i] in q["opciones"] else 0,
-                key=f"sel_{i}"
-            )
-            quiz["respuestas"][i] = seleccion if seleccion != "—" else None
-            st.write("")
-
-        # Correcció i feedback
-        if quiz["terminado"]:
-            contestades = sum(1 for r in quiz["respuestas"] if r is not None)
-            if contestades < len(quiz["preguntas"]):
-                st.warning(f"Has deixat {len(quiz['preguntas']) - contestades} sense contestar.")
-            correctes = 0
-            fallos = []
-            for i, q in enumerate(quiz["preguntas"]):
-                if quiz["respuestas"][i] == q["correcta"]:
-                    correctes += 1
-                else:
-                    fallos.append((i, q, quiz["respuestas"][i]))
-
-            st.success(f"Puntuació: **{correctes}/{len(quiz['preguntas'])}**")
-
-            if fallos:
-                st.error("Repàs d'errors:")
-                for i, q, elegida in fallos:
-                    # definicions per reforçar
-                    def_ok = monosilabos[q["correcta"]]["definicion"]
-                    def_p = monosilabos[q["pareja"]]["definicion"]
-                    # mostra la frase amb la solució col·locada
-                    solucio = q["enunciado"].replace("_____", f"**{q['correcta']}**")
-                    st.markdown(
-                        f"- **{i+1}.** {solucio}"
-                        f"<br/>Resposta triada: *{elegida or '—'}*  |  Correcta: **{q['correcta']}**"
-                        f"<br/>· {q['correcta']}: {def_ok}"
-                        f"<br/>· {q['pareja']}: {def_p}",
-                        unsafe_allow_html=True
-                    )
-
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔁 Repetir (mateix quiz)"):
-                    quiz["terminado"] = False
-            with col2:
-                if st.button("🆕 Nou quiz diferent"):
-                    preg = generar_preguntas(10)
-                    if not preg:
-                        st.error("No s'han pogut generar preguntes noves.")
-                    else:
-                        st.session_state.quiz = {
-                            "preguntas": preg,
-                            "respuestas": [None]*len(preg),
-                            "terminado": False
-                        }
 
 
 
