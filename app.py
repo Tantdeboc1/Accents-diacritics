@@ -3,7 +3,7 @@ import streamlit as st
 import unicodedata
 import re
 import unicodedata
-
+from datetime import datetime
 # ===========================
 # Configuración de página
 # ===========================
@@ -16,6 +16,12 @@ st.set_page_config(
 st.title("📘 Monosíl·labs: accents diacrítics en valencià")
 st.caption("Consulta definicions, exemples i parelles")
 
+with st.expander("Saps què és un monosíl·lab?"):
+    st.markdown(
+        "**Monosíl·lab**: paraula d’una sola síl·laba.\n\n"
+        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
+        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
+    )
 # ===========================
 # Utilidades
 # ===========================
@@ -415,17 +421,19 @@ with st.sidebar:
     st.header("Menú")
     opcio = st.radio(
         "Acció",
-        ["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
+        ["🔎 Cerca un monosíl·lab", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
         index=0
     )
     st.divider()
+# Marca de versió automàtica
 
-
+with st.sidebar:
+    st.info(f"Versió de l’app: {datetime.now():%Y-%m-%d %H:%M:%S}")
 # ===========================
 # Vistas
 # ===========================
-if opcio == "🔍 Buscar paraula":
-    st.header("Buscar monosíl·lab")
+if opcio == "🔎 Cerca un monosíl·lab":
+    st.header("Cerca un monosíl·lab")
     paraula_input = st.text_input(
         "Escriu el monosíl·lab (amb o sense accent):",
         placeholder="Ex: més, que, sí..."
@@ -572,6 +580,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
