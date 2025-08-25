@@ -431,8 +431,7 @@ if opcio == "🔍 Buscar paraula":
         placeholder="Ex: més, que, sí..."
     )
 
-    if paraula_input:
-        
+       if paraula_input:
         p = paraula_input.strip().lower()
         key = p if p in monosilabos else None
 
@@ -444,7 +443,7 @@ if opcio == "🔍 Buscar paraula":
             # Mostrar información
             display_word_info(key)
 
-          else:
+        else:
             st.warning("No està en la base de dades. Revisa l'accent.")
             # Mostrar pistes amb colors
             sugerides = search_suggestions(paraula_input)
@@ -572,6 +571,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
