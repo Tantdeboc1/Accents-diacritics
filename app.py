@@ -54,6 +54,35 @@ def display_word_info(paraula: str):
             st.write("**Exemples:**")
             for ex in info2["ejemplos"]:
                 st.write(f"- {ex}")
+import random, re
+
+def make_cloze(sentence: str, word: str) -> str:
+    """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
+    return re.sub(rf"\b{re.escape(word)}\b", "_____", sentence, count=1)
+
+def generar_preguntas(n=10):
+    """Genera hasta n preguntas (enunciado cloze + 2 opciones: correcta y su parella)."""
+    preguntas = []
+    bolsa = []
+    for w, info in monosilabos.items():
+        if w in parelles and parelles[w] in monosilabos:
+            for ex in info["ejemplos"]:
+                # Usar solo ejemplos que contengan la palabra tal cual (con acentos)
+                if re.search(rf"\b{re.escape(w)}\b", ex):
+                    bolsa.append((w, ex))
+    random.shuffle(bolsa)
+
+    for w, ex in bolsa:
+        pareja = parelles[w]
+        preguntas.append({
+            "enunciado": make_cloze(ex, w),
+            "correcta": w,
+            "opciones": random.sample([w, pareja], k=2),  # baraja orden
+            "pareja": pareja,
+        })
+        if len(preguntas) >= n:
+            break
+    return preguntas
 
 # ===========================
 # Dades (els 15 monosíl·labs)
@@ -204,7 +233,8 @@ if "buscar_sin_acentos" not in st.session_state:
 # ===========================
 with st.sidebar:
     st.header("Menú")
-    opcio = st.radio("Acció", ["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial"], index=0)
+    opcio = st.radio("Acció",["🔍 Buscar paraula", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
+    index=0
     st.divider()
     st.checkbox("Buscar sense accents (recomanat)", value=True, key="buscar_sin_acentos")
     st.caption("Ex.: escriu «mes» i trobarà «més».")
@@ -271,3 +301,93 @@ elif opcio == "🕘 Historial":
             st.success("Historial netejat.")
     else:
         st.write("Encara no hi ha cerques.")
+elif opcio == "📝 Mini-quiz":
+    st.header("Mini-quiz: tria la forma correcta (10 preguntes)")
+
+    # Estado inicial del quiz
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = None
+
+    colA, colB = st.columns(2)
+    with colA:
+        if st.button("🔁 Nou quiz (10 preguntes)"):
+            preg = generar_preguntas(10)
+            if not preg:
+                st.error("No s'han pogut generar preguntes. Revisa que els exemples continguen la paraula exacta.")
+            else:
+                st.session_state.quiz = {
+                    "preguntas": preg,
+                    "respuestas": [None]*len(preg),
+                    "terminado": False
+                }
+
+    with colB:
+        if st.session_state.get("quiz") and not st.session_state["quiz"]["terminado"]:
+            if st.button("✅ Enviar respostes"):
+                st.session_state["quiz"]["terminado"] = True
+
+    quiz = st.session_state.get("quiz")
+
+    if not quiz:
+        st.info("Prem **Nou quiz** per a començar.")
+    else:
+        # Render de les preguntes
+        for i, q in enumerate(quiz["preguntas"]):
+            st.markdown(f"**{i+1}.** {q['enunciado']}")
+            # Desplegable amb dues opcions (dropdown)
+            seleccion = st.selectbox(
+                f"Tria la forma correcta ({i+1})",
+                options=["—"] + q["opciones"],   # “—” = sense contestar
+                index=(["—"] + q["opciones"]).index(quiz["respuestas"][i]) if quiz["respuestas"][i] in q["opciones"] else 0,
+                key=f"sel_{i}"
+            )
+            quiz["respuestas"][i] = seleccion if seleccion != "—" else None
+            st.write("")
+
+        # Correcció i feedback
+        if quiz["terminado"]:
+            contestades = sum(1 for r in quiz["respuestas"] if r is not None)
+            if contestades < len(quiz["preguntas"]):
+                st.warning(f"Has deixat {len(quiz['preguntas']) - contestades} sense contestar.")
+            correctes = 0
+            fallos = []
+            for i, q in enumerate(quiz["preguntas"]):
+                if quiz["respuestas"][i] == q["correcta"]:
+                    correctes += 1
+                else:
+                    fallos.append((i, q, quiz["respuestas"][i]))
+
+            st.success(f"Puntuació: **{correctes}/{len(quiz['preguntas'])}**")
+
+            if fallos:
+                st.error("Repàs d'errors:")
+                for i, q, elegida in fallos:
+                    # definicions per reforçar
+                    def_ok = monosilabos[q["correcta"]]["definicion"]
+                    def_p = monosilabos[q["pareja"]]["definicion"]
+                    # mostra la frase amb la solució col·locada
+                    solucio = q["enunciado"].replace("_____", f"**{q['correcta']}**")
+                    st.markdown(
+                        f"- **{i+1}.** {solucio}"
+                        f"<br/>Resposta triada: *{elegida or '—'}*  |  Correcta: **{q['correcta']}**"
+                        f"<br/>· {q['correcta']}: {def_ok}"
+                        f"<br/>· {q['pareja']}: {def_p}",
+                        unsafe_allow_html=True
+                    )
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔁 Repetir (mateix quiz)"):
+                    quiz["terminado"] = False
+            with col2:
+                if st.button("🆕 Nou quiz diferent"):
+                    preg = generar_preguntas(10)
+                    if not preg:
+                        st.error("No s'han pogut generar preguntes noves.")
+                    else:
+                        st.session_state.quiz = {
+                            "preguntas": preg,
+                            "respuestas": [None]*len(preg),
+                            "terminado": False
+                        }
+
