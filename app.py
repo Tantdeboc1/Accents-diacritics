@@ -431,7 +431,7 @@ if opcio == "🔍 Buscar paraula":
         placeholder="Ex: més, que, sí..."
     )
 
-       if paraula_input:
+    if paraula_input:
         p = paraula_input.strip().lower()
         key = p if p in monosilabos else None
 
@@ -451,6 +451,7 @@ if opcio == "🔍 Buscar paraula":
                 st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
             else:
                 st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
+
 
 
 elif opcio == "📃 Llista":
@@ -571,6 +572,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
