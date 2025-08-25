@@ -2,23 +2,32 @@
 import streamlit as st
 import unicodedata
 import re
+import unicodedata
 
 # ===========================
 # Configuración de página
 # ===========================
 st.set_page_config(
-    page_title="Monosíl·labs (accent diacrític) · Valencià",
-    page_icon="🔎",
+    page_title="📘 Monosíl·labs: accents diacrítics en valencià",
+    page_icon="📘",
     layout="centered",
 )
 
-st.title("Monosíl·labs amb accent diacrític (valencià)")
-st.caption("Consulta definicions, exemples i parelles amb/sense accent")
+st.title("📘 Monosíl·labs: accents diacrítics en valencià")
+st.caption("Consulta definicions, exemples i parelles")
 
 # ===========================
 # Utilidades
 # ===========================
 
+def _is_accented(word: str) -> bool:
+    # True si la palabra tiene marca diacrítica (á, é, í, ó, ú, à, è, ò, ï, ü, etc.)
+    nfd = unicodedata.normalize("NFD", word or "")
+    return any(unicodedata.category(ch) == "Mn" for ch in nfd)
+
+def color_word(word: str) -> str:
+    # Devuelve Markdown con color: azul si acentuada, gris si no
+    return f":blue[{word}]" if _is_accented(word) else f":gray[{word}]"
 
 def search_suggestions(prefix: str):
      """Sugerencias por inicial (sin quitar acentos)."""
@@ -26,27 +35,27 @@ def search_suggestions(prefix: str):
      return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
 
 def display_word_info(paraula: str):
-    """Muestra la paraula, la categoria, la definició, exemples y el contrast."""
     info = monosilabos[paraula]
-    st.subheader(f"— {paraula} —")
+    # — Título de la palabra en color —
+    st.markdown(f"### — {color_word(paraula)} —")
     st.write("**Categoria:**", info.get("categoria", "—"))
     st.write("**Definició:**", info["definicion"])
     st.write("**Exemples:**")
     for ex in info["ejemplos"]:
         st.write(f"- {ex}")
 
-    # Mostrar la paraula en contrast (si existe)
+    # Contraste (también en color)
     if paraula in parelles:
         altra = parelles[paraula]
         if altra in monosilabos:
             info2 = monosilabos[altra]
-            st.subheader(f"— {altra} — *(contrast)*")
+            st.markdown(f"### — {color_word(altra)} — *_(contrast)_*")
             st.write("**Categoria:**", info2.get("categoria", "—"))
             st.write("**Definició:**", info2["definicion"])
             st.write("**Exemples:**")
             for ex in info2["ejemplos"]:
                 st.write(f"- {ex}")
-import random, re
+
 
 def make_cloze(sentence: str, word: str) -> str:
     """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
@@ -435,18 +444,20 @@ if opcio == "🔍 Buscar paraula":
             # Mostrar información
             display_word_info(key)
 
+      else:
+        st.warning("No està en la base de dades. Revisa l'accent.")
+    # Mostrar pistes amb colors
+        sugerides = search_suggestions(paraula_input)
+        if sugerides:
+        st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
         else:
-            st.warning("No està en la base de dades. Revisa l'accent.")
-            sugerides = search_suggestions(paraula_input)
-            if sugerides:
-                st.info(f"**Pistes** (mateixa lletra inicial): {', '.join(sugerides)}")
-            else:
-                st.info(f"**Paraules disponibles:** {', '.join(sorted(monosilabos.keys()))}")
+        st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
+
 
 elif opcio == "📃 Llista":
     st.header("Monosíl·labs disponibles (en parelles)")
     for acent, sense in pares:
-        st.write(f"- {acent} / {sense}")
+        st.markdown(f"- {color_word(acent)} / {color_word(sense)}")
 
 elif opcio == "📚 Llista detallada":
     st.header("Monosíl·labs amb definicions i exemples")
@@ -454,7 +465,7 @@ elif opcio == "📚 Llista detallada":
         for p in (acent, sense):
             if p in monosilabos:
                 info = monosilabos[p]
-                st.markdown(f"**— {p} —**")
+                st.markdown(f"**— {color_word(p)} —**")
                 st.write("**Categoria:**", info.get("categoria", "—"))
                 st.write("**Definició:**", info["definicion"])
                 st.write("**Exemples:**")
@@ -561,6 +572,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
