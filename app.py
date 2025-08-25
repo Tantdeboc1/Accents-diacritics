@@ -4,6 +4,7 @@ import unicodedata
 import re
 import unicodedata
 from datetime import datetime
+import random
 # ===========================
 # Configuración de página
 # ===========================
@@ -42,15 +43,24 @@ def search_suggestions(prefix: str):
 
 def display_word_info(paraula: str):
     info = monosilabos[paraula]
-    # — Título de la palabra en color —
+
+    # — Títol de la paraula en color —
     st.markdown(f"### — {color_word(paraula)} —")
     st.write("**Categoria:**", info.get("categoria", "—"))
     st.write("**Definició:**", info["definicion"])
+
+    # Exemples (2 aleatoris)
     st.write("**Exemples:**")
-    for ex in info["ejemplos"]:
+    ej = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
+    for ex in ej:
         st.write(f"- {ex}")
 
-    # Contraste (también en color)
+    # Bloc per copiar: definició + exemples mostrats
+    bloc = f"{paraula.upper()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
+    st.code(bloc)
+    st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l")
+
+    # — Contrast (si existeix) —
     if paraula in parelles:
         altra = parelles[paraula]
         if altra in monosilabos:
@@ -58,10 +68,12 @@ def display_word_info(paraula: str):
             st.markdown(f"### — {color_word(altra)} — *_(contrast)_*")
             st.write("**Categoria:**", info2.get("categoria", "—"))
             st.write("**Definició:**", info2["definicion"])
-            st.write("**Exemples:**")
-            for ex in info2["ejemplos"]:
-                st.write(f"- {ex}")
 
+            # Exemples (2 aleatoris) de la parella  ⬇️  (ojo a la indentació)
+            st.write("**Exemples:**")
+            ej2 = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
+            for ex in ej2:
+                st.write(f"- {ex}")
 
 def make_cloze(sentence: str, word: str) -> str:
     """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
@@ -580,6 +592,7 @@ elif opcio == "📝 Mini-quiz":
                             "respuestas": [None]*len(preg),
                             "terminado": False
                         }
+
 
 
 
