@@ -610,15 +610,17 @@ elif opcio == "🕘 Historial":
 elif opcio == "📝 Mini-quiz":
     st.header("Mini-quiz: tria la forma correcta")
 
-    # -------- Estado inicial necesario --------
+    # -------- Estat inicial necessari --------
     if "quiz" not in st.session_state:
         st.session_state.quiz = None
     if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10  # valor por defecte
+        st.session_state.quiz_n = 10  # valor per defecte
     if "scores" not in st.session_state:
-        st.session_state.scores = []  # {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
+        st.session_state.scores = []  # {"nom":..., "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
+    if "last_score_sig" not in st.session_state:
+        st.session_state.last_score_sig = None
 
-    # -------- Selector nº de preguntes + botón nuevo quiz --------
+    # -------- Selector nº de preguntes + botó "nou quiz" --------
     col_sel, col_btn = st.columns([1, 1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
@@ -640,11 +642,30 @@ elif opcio == "📝 Mini-quiz":
                     "guardat": False
                 }
 
-    quiz = st.session_state.get("quiz")
+    quiz = st.session_state.quiz
 
-    # -------- Si no hi ha quiz, indicació --------
+    # -------- Si no hi ha quiz, indicació + diagnòstic opcional --------
     if not quiz:
         st.info("Prem **Nou quiz** per a començar.")
+
+        # Diagnòstic GitHub (opcional)
+        with st.expander("Diagnòstic GitHub", expanded=False):
+            has_token = "GITHUB_TOKEN" in st.secrets
+            has_repo  = "GITHUB_REPO" in st.secrets
+            st.write("Token present:", "✅" if has_token else "❌")
+            st.write("Repo configurat:", "✅" if has_repo else "❌")
+            if has_repo:
+                st.write("Repo →", st.secrets["GITHUB_REPO"])
+                st.write("Branch →", st.secrets.get("GITHUB_BRANCH","main"))
+                st.write("Path →", st.secrets.get("GITHUB_SCORES_PATH","scores.jsonl"))
+            if st.button("🔧 Prova guardat a GitHub", key="btn_test_github"):
+                from datetime import datetime
+                rec = {"nom":"TEST","puntuacio":1,"total":1,"data":datetime.now().strftime("%Y-%m-%d %H:%M")}
+                if "append_score_to_github" not in globals():
+                    st.error("No trobe append_score_to_github(). Has pegat els helpers?")
+                else:
+                    ok = append_score_to_github(rec)
+                    st.success("OK! S'ha creat/actualitzat scores.jsonl.") if ok else st.error("No s'ha pogut escriure. Mira Logs.")
     else:
         # -------- Render de preguntes (2 opcions en desplegable) --------
         for i, q in enumerate(quiz["preguntas"]):
@@ -695,23 +716,11 @@ elif opcio == "📝 Mini-quiz":
                     )
 
             st.divider()
-with st.expander("Diagnòstic GitHub", expanded=False):
-    has_token = "GITHUB_TOKEN" in st.secrets
-    has_repo  = "GITHUB_REPO" in st.secrets
-    st.write("Token present:", "✅" if has_token else "❌")
-    st.write("Repo configurat:", "✅" if has_repo else "❌")
 
-    if st.button("🔧 Prova guardat a GitHub", key="btn_test_github"):
-        from datetime import datetime
-        rec = {"nom":"TEST","puntuacio":1,"total":1,"data":datetime.now().strftime("%Y-%m-%d %H:%M")}
-        if "append_score_to_github" not in globals():
-            st.error("No trobe append_score_to_github(). Has pegat els helpers?")
-        else:
-            ok = append_score_to_github(rec)
-            st.success("OK! S'ha creat/actualitzat scores.jsonl.") if ok else st.error("No s'ha pogut escriure. Mira Logs.")
             # -------- Rànquing estil arcade --------
             st.subheader("🏆 Rànquing (estil arcade)")
             col_nom, col_guardar = st.columns([2, 1])
+
             with col_nom:
                 nom_input = st.text_input(
                     "Escriu el teu nom (5 lletres màx.)",
@@ -719,56 +728,51 @@ with st.expander("Diagnòstic GitHub", expanded=False):
                     placeholder="p.ex. JOSEP",
                     help="Nom curt per a la classificació. 1–5 lletres (A–Z)."
                 )
-with col_guardar:
-    from datetime import datetime
-    if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
-        nom_clean = (nom_input or "").strip().upper()
-        import re
-        if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
-            st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
-        else:
-            record = {
-                "nom": nom_clean,
-                "puntuacio": correctes,
-                "total": total,
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M")
-            }
 
-            # Firma anti-duplicats
-            sig = f"{record['nom']}-{record['puntuacio']}-{record['total']}"
-            if "last_score_sig" not in st.session_state:
-                st.session_state.last_score_sig = None
-            if st.session_state.last_score_sig == sig:
-                st.info("Ja has guardat este mateix resultat.")
-            else:
-                st.session_state.last_score_sig = sig
-                # marca optimista per evitar doble clics
-                quiz["guardat"] = True
+            with col_guardar:
+                from datetime import datetime
+                if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
+                    nom_clean = (nom_input or "").strip().upper()
+                    import re
+                    if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
+                        st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
+                    else:
+                        record = {
+                            "nom": nom_clean,
+                            "puntuacio": correctes,
+                            "total": total,
+                            "data": datetime.now().strftime("%Y-%m-%d %H:%M")
+                        }
 
-                # guarda en memòria
-                st.session_state.scores.append(record)
+                        # Anti-duplicats: firma + marca optimista
+                        sig = f"{record['nom']}-{record['puntuacio']}-{record['total']}"
+                        if st.session_state.last_score_sig == sig:
+                            st.info("Ja has guardat este mateix resultat.")
+                        else:
+                            st.session_state.last_score_sig = sig
+                            quiz["guardat"] = True  # evita doble clic
 
-                # i persistència remota si existeixen helpers
-                ok = True
-                if "append_score_to_github" in globals():
-                    try:
-                        ok = append_score_to_github(record)
-                    except Exception:
-                        ok = False
+                            # 1) memòria
+                            st.session_state.scores.append(record)
 
-                if ok:
-                    st.success("Puntuació guardada al rànquing!")
-                else:
-                    st.warning("S'ha guardat en memòria, però no a GitHub (torna-ho a intentar).")
+                            # 2) GitHub (si tens helpers)
+                            ok = True
+                            if "append_score_to_github" in globals():
+                                try:
+                                    ok = append_score_to_github(record)
+                                except Exception:
+                                    ok = False
+
+                            if ok:
+                                st.success("Puntuació guardada al rànquing!")
+                            else:
+                                st.warning("S'ha guardat en memòria, però no a GitHub (torna-ho a intentar).")
 
             # -------- Mostrar rànquing (Top 10) --------
-            # Si tens lectura remota de GitHub, pots combinar:
-            scores_all = st.session_state.scores[:]  # bàsic: només memòria
-            # (Opcional) carregar del repo si tens load_scores_from_github():
+            scores_all = st.session_state.scores[:]  # bàsic: memòria
             if "load_scores_from_github" in globals():
                 try:
                     scores_remote, _ = load_scores_from_github()
-                    # barreja senzill: afegeix locals que no estiguen al remot
                     for s in scores_remote:
                         if s not in scores_all:
                             scores_all.append(s)
@@ -821,6 +825,7 @@ with col_guardar:
                             "terminado": False,
                             "guardat": False
                         }
+
 
 
 
