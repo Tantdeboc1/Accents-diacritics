@@ -9,3 +9,4 @@ definicions i exemples de monosíl·labs amb o sense accent diacrític.
   ```bash
   pip install -r requirements.txt
   streamlit run app.py
+```
