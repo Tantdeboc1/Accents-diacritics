@@ -661,8 +661,6 @@ elif opcio == "📝 Mini-quiz":
             )
             quiz["respuestas"][i] = seleccion if seleccion != "—" else None
             st.write("")
-
-        # -------- Botó per corregir --------
 # -------- Botó per corregir --------
 if st.button("Corregir", key="btn_corregir"):
     # Calculamos nota
@@ -673,16 +671,15 @@ if st.button("Corregir", key="btn_corregir"):
     )
     total = len(quiz["preguntas"])
 
-    # Guardamos el estado post-corrección para que no desaparezca con el rerun
+    # Guardamos estado post-correcció
     st.session_state.quiz_corrected = True
     st.session_state.last_score = {
         "puntuacio": correctes,
         "total": total,
-        # el nombre lo pediremos justo ahora, pero lo guardamos luego
-        "nom": "",
+        "nom": st.session_state.get("last_score", {}).get("nom", ""),
     }
 
-# -------- Panel post-correcció (estable tras el rerun) --------
+# -------- Panel post-correcció (estable en rerun) --------
 if st.session_state.get("quiz_corrected"):
     score = st.session_state.get("last_score", {})
     correctes = score.get("puntuacio", 0)
@@ -690,38 +687,33 @@ if st.session_state.get("quiz_corrected"):
 
     st.success(f"Has encertat {correctes}/{total}")
 
-    # Nombre + fecha
     from datetime import datetime
     st.session_state.last_score["nom"] = st.text_input(
         "El teu nom (opcional):",
-        value=st.session_state.last_score.get("nom",""),
+        value=st.session_state.last_score.get("nom", ""),
         key="inp_nom_quiz"
     )
     data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-    colA, colB, colC = st.columns([1,1,1])
+    colA, colB, colC = st.columns([1, 1, 1])
 
     with colA:
         if st.button("💾 Desa resultat", key="btn_save_score"):
             # Guarda local en sessió
             if "scores" not in st.session_state:
                 st.session_state.scores = []
-            st.session_state.scores.append({
-                "nom": st.session_state.last_score.get("nom",""),
+            record = {
+                "nom": st.session_state.last_score.get("nom", ""),
                 "puntuacio": correctes,
                 "total": total,
                 "data": data_str,
-            })
+            }
+            st.session_state.scores.append(record)
             st.success("Resultat guardat en la sessió.")
-            # Si tienes GitHub configurado y quieres guardar también allí:
+            # GitHub opcional
             try:
                 if "append_score_to_github" in globals():
-                    ok = append_score_to_github({
-                        "nom": st.session_state.last_score.get("nom",""),
-                        "puntuacio": correctes,
-                        "total": total,
-                        "data": data_str,
-                    })
+                    ok = append_score_to_github(record)
                     if ok:
                         st.success("Rànquing a GitHub actualitzat.")
                     else:
@@ -731,18 +723,18 @@ if st.session_state.get("quiz_corrected"):
 
     with colB:
         if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-            st.session_state["__go_rank__"] = True  # el router redirigeix
+            go_to("🏆 Rànquing")  # << redirección fiable
 
     with colC:
         if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
-            # limpiamos estado post-correcció i generem un nou quiz
+            # Limpia estado de corrección y genera otro quiz
             st.session_state.quiz_corrected = False
             st.session_state.last_score = {}
-            quiz = generar_quiz(st.session_state.quiz_n)
-            st.session_state.quiz = quiz
-            st.experimental_rerun()
-
-
+            st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
+            try:
+                st.rerun()
+            except Exception:
+                st.experimental_rerun()
 
 elif opcio == "🏆 Rànquing":
     import pandas as pd
@@ -750,25 +742,24 @@ elif opcio == "🏆 Rànquing":
 
     st.header("🏆 Rànquing")
 
-    # Botones de refresco/descarga arriba (útil si acabas de guardar una puntuación)
-    col1, col2 = st.columns([1, 1], vertical_alignment="center")
-    with col1:
-        if st.button("🔄 Actualitza rànquing ara"):
-            st.cache_data.clear()
-    with col2:
-        st.caption("S’esborra la memòria cau i es torna a llegir de GitHub.")
+    # Botón de refresco (limpia caché y relee)
+    if st.button("🔄 Actualitza rànquing ara"):
+        st.cache_data.clear()
+        try:
+            st.rerun()
+        except Exception:
+            st.experimental_rerun()
 
-    # Leer datos (usa tu helper cacheado)
+    # Leer datos
     scores, _ = load_scores_from_github()
 
     if not scores:
         st.info("Encara no hi ha puntuacions al rànquing.")
     else:
-        # Helpers para ordenar por % i per data
-        def pct(r):
-            num = r.get("puntuacio", 0)
+        # Orden: % y fecha desc
+        def pct(r): 
             den = max(1, r.get("total", 1))
-            return num / den
+            return (r.get("puntuacio", 0) / den)
 
         def parse_dt(s: str):
             try:
@@ -776,14 +767,12 @@ elif opcio == "🏆 Rànquing":
             except Exception:
                 return datetime.min
 
-        # Orden: % i després data (desc)
         scores_sorted = sorted(
             scores,
             key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
             reverse=True
         )
 
-        # Construir DataFrame
         rows = []
         for r in scores_sorted:
             num = r.get("puntuacio", 0)
@@ -794,28 +783,28 @@ elif opcio == "🏆 Rànquing":
                 "%": round(100 * num / den),
                 "Data": r.get("data", "—"),
             })
+
         df = pd.DataFrame(rows)
 
-        st.dataframe(
-            df,
-            hide_index=True,
-            use_container_width=True,
-        )
+        st.dataframe(df, hide_index=True, use_container_width=True)
 
-        # Descarga opcional (CSV)
+        # Descarga CSV (asegúrate de crear df ANTES de este botón)
         csv = df.to_csv(index=False).encode("utf-8")
         st.download_button(
             "⬇️ Descarrega CSV",
             data=csv,
             file_name="ranking.csv",
-            mime="text/csv"
+            mime="text/csv",
+            key="btn_download_rank"
         )
+
 
 # ——— Redirecció automàtica al rànquing després del quiz ———
 if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
