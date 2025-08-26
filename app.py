@@ -663,30 +663,85 @@ elif opcio == "📝 Mini-quiz":
             st.write("")
 
         # -------- Botó per corregir --------
-        if st.button("Corregir"):
-            correctes = sum(
-                r == q["correcta"]
-                for r, q in zip(quiz["respuestas"], quiz["preguntas"])
-                if r
-            )
-            total = len(quiz["preguntas"])
-            st.success(f"Has encertat {correctes}/{total}")
+# -------- Botó per corregir --------
+if st.button("Corregir", key="btn_corregir"):
+    # Calculamos nota
+    correctes = sum(
+        r == q["correcta"]
+        for r, q in zip(quiz["respuestas"], quiz["preguntas"])
+        if r
+    )
+    total = len(quiz["preguntas"])
 
-            # 👇 Nou botó per a veure el rànquing
-            if st.button("🏆 Veure rànquing"):
-                st.session_state["__go_rank__"] = True
+    # Guardamos el estado post-corrección para que no desaparezca con el rerun
+    st.session_state.quiz_corrected = True
+    st.session_state.last_score = {
+        "puntuacio": correctes,
+        "total": total,
+        # el nombre lo pediremos justo ahora, pero lo guardamos luego
+        "nom": "",
+    }
 
-            # Opcional: guardar puntuació en local/session o a GitHub si tens activat
-            from datetime import datetime
-            nou_score = {
-                "nom": st.text_input("El teu nom (opcional):", ""),
+# -------- Panel post-correcció (estable tras el rerun) --------
+if st.session_state.get("quiz_corrected"):
+    score = st.session_state.get("last_score", {})
+    correctes = score.get("puntuacio", 0)
+    total = score.get("total", 0)
+
+    st.success(f"Has encertat {correctes}/{total}")
+
+    # Nombre + fecha
+    from datetime import datetime
+    st.session_state.last_score["nom"] = st.text_input(
+        "El teu nom (opcional):",
+        value=st.session_state.last_score.get("nom",""),
+        key="inp_nom_quiz"
+    )
+    data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    colA, colB, colC = st.columns([1,1,1])
+
+    with colA:
+        if st.button("💾 Desa resultat", key="btn_save_score"):
+            # Guarda local en sessió
+            if "scores" not in st.session_state:
+                st.session_state.scores = []
+            st.session_state.scores.append({
+                "nom": st.session_state.last_score.get("nom",""),
                 "puntuacio": correctes,
                 "total": total,
-                "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            }
-            if st.button("💾 Desa resultat"):
-                st.session_state.scores.append(nou_score)
-                st.success("Resultat guardat en la sessió actual.")
+                "data": data_str,
+            })
+            st.success("Resultat guardat en la sessió.")
+            # Si tienes GitHub configurado y quieres guardar también allí:
+            try:
+                if "append_score_to_github" in globals():
+                    ok = append_score_to_github({
+                        "nom": st.session_state.last_score.get("nom",""),
+                        "puntuacio": correctes,
+                        "total": total,
+                        "data": data_str,
+                    })
+                    if ok:
+                        st.success("Rànquing a GitHub actualitzat.")
+                    else:
+                        st.info("No s'ha pogut guardar a GitHub.")
+            except Exception as e:
+                st.info(f"No s'ha pogut guardar a GitHub: {e}")
+
+    with colB:
+        if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+            st.session_state["__go_rank__"] = True  # el router redirigeix
+
+    with colC:
+        if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+            # limpiamos estado post-correcció i generem un nou quiz
+            st.session_state.quiz_corrected = False
+            st.session_state.last_score = {}
+            quiz = generar_quiz(st.session_state.quiz_n)
+            st.session_state.quiz = quiz
+            st.experimental_rerun()
+
 
 
 elif opcio == "🏆 Rànquing":
@@ -761,6 +816,7 @@ if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
