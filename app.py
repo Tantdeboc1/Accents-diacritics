@@ -113,62 +113,13 @@ def generar_preguntas(n=10):
             break
     return preguntas
     
-def render_ranking_sidebar(max_rows=10):
-    """
-    Muestra el ránquing en la barra lateral dentro de un expander.
-    Ordena por % de aciertos y por fecha (desc).
-    """
-    import pandas as pd
-    from datetime import datetime
-
-    def parse_dt(s: str):
-        # intenta "YYYY-MM-DD HH:MM"; si falla, usa fecha mínima
-        try:
-            return datetime.strptime(s, "%Y-%m-%d %H:%M")
-        except Exception:
-            return datetime.min
-
-    with st.sidebar.expander("🏆 Rànquing", expanded=False):
-        scores, _ = load_scores_from_github()
-
-        if not scores:
-            st.caption("Encara no hi ha puntuacions.")
-            if st.button("🔄 Actualitza", key="rank_refresh_empty"):
-                st.cache_data.clear()
-            return
-
-        # Orden principal: % aciertos; secundaria: fecha
-        def pct(r):
-            num = r.get("puntuacio", 0)
-            den = max(1, r.get("total", 1))
-            return num / den
-
-        scores_sorted = sorted(
-            scores,
-            key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
-            reverse=True
-        )
-
-        # Construimos filas
-        rows = []
-        for i, r in enumerate(scores_sorted[:max_rows], start=1):
-            num = r.get("puntuacio", 0)
-            den = max(1, r.get("total", 1))
-            perc = int(round(100 * num / den))
-            rows.append({
-                "#": i,
-                "Nom": str(r.get("nom", "—"))[:14],
-                "Punts": f"{num}/{den}",
-                "%": perc,
-                "Data": r.get("data", "—"),
-            })
-
-        df = pd.DataFrame(rows)
-        st.dataframe(df, hide_index=True, use_container_width=True)
-
-        # Botón de refresco manual (por si has guardado una puntuación hace nada)
-        if st.button("🔄 Actualitza rànquing", key="rank_refresh_btn"):
-            st.cache_data.clear()
+def generar_quiz(n=10):
+    """Adapta generar_preguntas() al formato que espera el Mini-quiz."""
+    preguntas = generar_preguntas(n)
+    return {
+        "preguntas": preguntas,
+        "respuestas": [None] * len(preguntas)
+    }
 
 # ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
 def _gh_headers():
@@ -810,6 +761,7 @@ if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
