@@ -195,7 +195,12 @@ def generar_quiz(n=10):
         "preguntas": preguntas,
         "respuestas": [None] * len(preguntas)
     }
-
+def show_quiz_progress(current_question: int, total_questions: int):
+    """Muestra progreso del quiz"""
+    progress = current_question / total_questions
+    st.progress(progress)
+    st.caption(f"Pregunta {current_question} de {total_questions}")
+    
 # ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
 def _gh_headers():
     return {
@@ -615,19 +620,16 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
+if st.session_state.get("__nav_target__"):
+    st.session_state["menu"] = st.session_state.pop("__nav_target__")
 
-
-# constante para evitar fallos de tíldes/espacios
 MENU_RANK = "🏆 Rànquing"
 
-# valor por defecto del menú
 if "menu" not in st.session_state:
     st.session_state["menu"] = "🔎 Cerca un monosíl·lab"
 
 with st.sidebar:
     st.header("Menú")
-
-    # el radio ES la fuente de verdad: guarda directamente en session_state["menu"]
     st.radio(
         "Acció",
         [
@@ -636,14 +638,10 @@ with st.sidebar:
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
-            MENU_RANK,  # usa la constante
+            MENU_RANK,
         ],
-        key="menu",   # ← clave única; NO pongas 'index=' manual
+        key="menu",
     )
-
-    st.divider()
-    st.info(f"Versió de l’app: {datetime.now():%Y-%m-%d %H:%M:%S}")
-
 # router usa SIEMPRE lo que haya en session_state["menu"]
 opcio = st.session_state["menu"]
 
@@ -816,10 +814,10 @@ elif opcio == "📝 Mini-quiz":
                     except Exception as e:
                         st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-            with colB:
-                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["menu"] = MENU_RANK
-                    rerun_safe()
+         with colB:
+            if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+                st.session_state["__nav_target__"] = MENU_RANK  # p.ej. MENU_RANK = "🏆 Rànquing"
+                rerun_safe()
 
             with colC:
                 if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
@@ -887,6 +885,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
