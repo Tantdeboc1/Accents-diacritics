@@ -641,17 +641,25 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
+# Hook de navegación: aplica redirección pendiente ANTES de dibujar el sidebar
 if st.session_state.get("__nav_target__"):
     st.session_state["menu"] = st.session_state.pop("__nav_target__")
-    
+
+MENU_RANK = "🏆 Rànquing"
+
+# Valor por defecto del menú si no existe aún
+if "menu" not in st.session_state:
+    st.session_state["menu"] = "🔎 Cerca un monosíl·lab"
+
 with st.sidebar:
     st.header("📋 Menú")
-    
+
     # Indicador de tema actual
     theme_status = "🌙 Tema fosc" if st.session_state.get("dark_mode", False) else "☀️ Tema clar"
     st.caption(theme_status)
-    
-    opcio = st.radio(
+
+    # El radio lee/escribe directamente en session_state["menu"]
+    st.radio(
         "Acció",
         [
             "🔎 Cerca un monosíl·lab",
@@ -659,31 +667,34 @@ with st.sidebar:
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
-            "🏆 Rànquing",
-        
+            MENU_RANK,
         ],
-        index=0
+        key="menu",
     )
-    
+
     st.divider()
-    opcio = st.session_state["menu"]
-    
+
     # Estadísticas rápidas
     st.caption("📊 **Estadístiques ràpides**")
     total_words = len(monosilabos)
-    total_pairs = len(pares)
+    total_pairs = len(parelles) if 'parelles' in globals() else 0
     st.caption(f"• {total_words} monosíl·labs")
     st.caption(f"• {total_pairs} parelles")
-    
+
     if st.session_state.get("historial"):
         st.caption(f"• {len(st.session_state.historial)} cerques")
-    
+
     if st.session_state.get("scores"):
-        avg_score = sum(s["puntuacio"]/s["total"] for s in st.session_state.scores[-5:]) / min(5, len(st.session_state.scores))
-        st.caption(f"• Mitjana: {avg_score:.1%}")
-    
+        last = st.session_state.scores[-5:]
+        if last:
+            avg_score = sum(s["puntuacio"] / max(1, s["total"]) for s in last) / len(last)
+            st.caption(f"• Mitjana: {avg_score:.1%}")
+
     st.divider()
     st.info(f"Versió: {datetime.now():%Y-%m-%d %H:%M:%S}")
+
+# Router: SIEMPRE después de construir el sidebar
+opcio = st.session_state["menu"]
 
 # ===========================
 # Vistas
@@ -950,6 +961,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
