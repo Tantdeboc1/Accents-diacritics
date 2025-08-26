@@ -1,123 +1,210 @@
-# -*- coding: utf-8 -*-
+# 1. Primero las importaciones
 import streamlit as st
 import unicodedata
 import re
 from datetime import datetime
 import random
 import json, base64, requests, time
-# ===========================
-# Configuración de página
-# ===========================
-st.set_page_config(
-    page_title="📘 Monosíl·labs: accents diacrítics en valencià",
-    page_icon="📘",
-    layout="centered",
-    initial_sidebar_state="expanded"
-)
+import sys
+import logging
+
+# 2. Configuración de logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# 3. Definir TODAS las funciones ANTES de usarlas
+def init_session_state():
+    """Inicializa el estado de la sesión"""
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False  # Por defecto tema CLARO
+    if "historial" not in st.session_state:
+        st.session_state.historial = []
+    if "quiz" not in st.session_state:
+        st.session_state.quiz = None
+    if "quiz_n" not in st.session_state:
+        st.session_state.quiz_n = 10
+    if "scores" not in st.session_state:
+        st.session_state.scores = []
+    if "quiz_corrected" not in st.session_state:
+        st.session_state.quiz_corrected = False
+    if "last_score" not in st.session_state:
+        st.session_state.last_score = {}
+
 def inject_custom_css():
-    """CSS personalizado con soporte para tema oscuro"""
-    dark_mode = st.session_state.get("dark_mode", False)
-    
-    if dark_mode:
-        # Tema oscuro
+    """CSS personalizado con soporte para tema oscuro y claro (contraste garantizado)."""
+    dark = st.session_state.get("dark_mode", False)
+    if dark:
+        # ===== MODO OSCURO =====
         st.markdown("""
         <style>
-        .stApp {
-            background-color: #1e1e1e;
-            color: #ffffff;
+        :root {
+            --bg: #1e1e1e;
+            --bg-2: #2a2a2a;
+            --bg-3: #2d2d2d;
+            --fg: #f5f7fa;
+            --muted: #cbd5e1;
+            --border: #404040;
+            --accent: #4a9eff;
+            --btn: #2d2d2d;
+            --btn-hover: #404040;
         }
-        .block-container { 
-            padding-bottom: 2rem !important; 
-            background-color: #1e1e1e;
+        /* Base */
+        html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
+            background-color: var(--bg) !important;
+            color: var(--fg) !important;
         }
-        .stSelectbox > div > div {
-            background-color: #2d2d2d !important;
-            color: white !important;
+        /* Texto común y encabezados */
+        .stMarkdown, .stText, .stCaption, .stMetric, .stAlert, .stCodeBlock,
+        h1, h2, h3, h4, h5, h6, p, span, label {
+            color: var(--fg) !important;
         }
-        .stTextInput > div > div > input {
-            background-color: #2d2d2d !important;
-            color: white !important;
+        /* Sidebar */
+        [data-testid="stSidebar"], .sidebar .sidebar-content {
+            background-color: var(--bg) !important;
+            color: var(--fg) !important;
         }
+        /* Inputs */
+        .stTextInput > div > div > input,
+        .stSelectbox > div > div,
+        .stRadio > div,
+        .stTextArea textarea {
+            background-color: var(--bg-3) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        /* Botones */
+        .stButton > button {
+            background-color: var(--btn) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        .stButton > button:hover {
+            background-color: var(--btn-hover) !important;
+        }
+        /* Botón primario (Streamlit >=1.25) */
+        button[data-testid="baseButton-primary"] {
+            background-color: var(--accent) !important;
+            border-color: var(--accent) !important;
+            color: #ffffff !important;
+        }
+        /* Bloques del quiz */
         .quiz-progress {
-            background-color: #333333;
-            border-radius: 10px;
-            padding: 10px;
-            margin: 10px 0;
+            background-color: #333333 !important;
+            border-radius: 10px; padding: 10px; margin: 10px 0;
+            border-left: 4px solid var(--accent);
+        }
+        .quiz-question {
+            border-left: 4px solid var(--accent);
+            padding-left: 1rem; margin: 1rem 0;
+            background-color: var(--bg-2);
+            border-radius: 5px; padding: 1rem;
+            border: 1px solid var(--border);
+        }
+        .success-score {
+            background-color: #1a472a; border: 1px solid #2d5a3d;
+            border-radius: 5px; padding: 1rem; margin: 1rem 0;
+            color: var(--fg) !important;
+        }
+        /* DataFrame */
+        .stDataFrame, .stDataFrame * {
+            color: var(--fg) !important;
         }
         </style>
         """, unsafe_allow_html=True)
     else:
-        # Tema claro (tu CSS actual + mejoras)
+        # ===== MODO CLARO =====
         st.markdown("""
         <style>
-        .block-container { 
-            padding-bottom: 2rem !important; 
-            padding-top: 1rem !important;
+        :root {
+            --bg: #ffffff;
+            --bg-2: #ffffff;
+            --bg-3: #ffffff;
+            --fg: #111827;        /* gris muy oscuro (mejor que negro puro) */
+            --muted: #374151;
+            --border: #d1d5db;
+            --accent: #0066cc;
+            --btn: #f8f9fa;
+            --btn-hover: #e9ecef;
         }
+        /* Base */
+        html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
+            background-color: var(--bg) !important;
+            color: var(--fg) !important;
+        }
+        /* Texto común y encabezados */
+        .stMarkdown, .stText, .stCaption, .stMetric, .stAlert, .stCodeBlock,
+        h1, h2, h3, h4, h5, h6, p, span, label {
+            color: var(--fg) !important;
+        }
+        /* Sidebar */
+        [data-testid="stSidebar"], .sidebar .sidebar-content {
+            background-color: #f8f9fa !important;
+            color: var(--fg) !important;
+        }
+        /* Inputs */
+        .stTextInput > div > div > input,
+        .stSelectbox > div > div,
+        .stRadio > div,
+        .stTextArea textarea {
+            background-color: var(--bg-3) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        /* Botones */
+        .stButton > button {
+            background-color: var(--btn) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        .stButton > button:hover {
+            background-color: var(--btn-hover) !important;
+            border: 1px solid #adb5bd !important;
+        }
+        /* Botón primario (Streamlit >=1.25) */
+        button[data-testid="baseButton-primary"] {
+            background-color: var(--accent) !important;
+            border-color: var(--accent) !important;
+            color: #ffffff !important;
+        }
+        /* Bloques del quiz */
         .quiz-progress {
-            background-color: #f0f2f6;
-            border-radius: 10px;
-            padding: 10px;
-            margin: 10px 0;
-            border-left: 4px solid #1f77b4;
+            background-color: #f8f9fa;
+            border-radius: 10px; padding: 10px; margin: 10px 0;
+            border-left: 4px solid var(--accent);
+            border: 1px solid #e9ecef;
         }
         .quiz-question {
-            border-left: 4px solid #1f77b4;
-            padding-left: 1rem;
-            margin: 1rem 0;
-            background-color: #f8f9fa;
-            border-radius: 5px;
-            padding: 1rem;
+            border-left: 4px solid var(--accent);
+            padding-left: 1rem; margin: 1rem 0;
+            background-color: var(--bg-2);
+            border-radius: 5px; padding: 1rem;
+            border: 1px solid #e9ecef;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
         }
         .success-score {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-            padding: 1rem;
-            margin: 1rem 0;
+            background-color: #d4edda; border: 1px solid #c3e6cb;
+            border-radius: 5px; padding: 1rem; margin: 1rem 0;
+            color: #0f5132 !important;
+        }
+        /* DataFrame */
+        .stDataFrame, .stDataFrame * {
+            color: var(--fg) !important;
         }
         </style>
         """, unsafe_allow_html=True)
 
-# Inyectar CSS personalizado AL INICIO
-inject_custom_css()
-col_title, col_theme = st.columns([4, 1])
 
-with col_title:
-    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
-    st.caption("Consulta definicions, exemples i parelles")
-
-with col_theme:
-    # Toggle tema oscuro
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False
-    
-    theme_icon = "🌙" if not st.session_state.dark_mode else "☀️"
-    theme_text = "Fosc" if not st.session_state.dark_mode else "Clar"
-    
-    if st.button(f"{theme_icon} {theme_text}", help="Canviar tema"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        st.rerun()
-        
-with st.expander("Saps què és un monosíl·lab?"):
-    st.markdown(
-        "**Monosíl·lab**: paraula d’una sola síl·laba.\n\n"
-        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
-        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
-    )
-# ===========================
-# Utilidades
-# ===========================
-
-
-
-def show_quiz_progress(current_question: int, total_questions: int):
+def show_quiz_progress(current_question: int, total_questions: int, answered_count: int = None):
     """Muestra progreso del quiz"""
-    progress = current_question / total_questions
-    st.progress(progress)
-    st.caption(f"Pregunta {current_question} de {total_questions}")
+    if answered_count is not None:
+        progress = answered_count / total_questions
+        st.progress(progress)
+        st.caption(f"Respondidas {answered_count} de {total_questions} preguntas")
+    else:
+        progress = current_question / total_questions
+        st.progress(progress)
+        st.caption(f"Pregunta {current_question} de {total_questions}")
 
-    
 def _is_accented(word: str) -> bool:
     # True si la palabra tiene marca diacrítica (á, é, í, ó, ú, à, è, ò, ï, ü, etc.)
     nfd = unicodedata.normalize("NFD", word or "")
@@ -172,7 +259,7 @@ def display_word_info(paraula: str):
             st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l", key=f"copy_{altra}")
 
 def rerun_safe():
-    """Forza un rerun compatible con versiones nuevas/antiguas de Streamlit."""
+    """Forza un rerun compatible amb versiones nuevas/antiguas de Streamlit."""
     try:
         st.rerun()              # versiones nuevas
     except Exception:
@@ -216,12 +303,7 @@ def generar_quiz(n=10):
         "preguntas": preguntas,
         "respuestas": [None] * len(preguntas)
     }
-def show_quiz_progress(current_question: int, total_questions: int):
-    """Muestra progreso del quiz"""
-    progress = current_question / total_questions
-    st.progress(progress)
-    st.caption(f"Pregunta {current_question} de {total_questions}")
-    
+
 # ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
 def _gh_headers():
     return {
@@ -306,20 +388,19 @@ def append_score_to_github(record: dict, max_retries=3):
                 return False
             time.sleep(0.8)
     return False
-# ==== (fi helpers GitHub) ====
 
 # ===========================
 # Dades (els 15 monosíl·labs)
 # ===========================
 monosilabos = {
     "sí": {"categoria": "adverbi d'afirmació",
-           "definicion": "Adverbi d’afirmació.",
+           "definicion": "Adverbi d'afirmació.",
            "ejemplos": [
                "Sí, vindré demà.",
                "Va dir que sí a la proposta.",
                "Sí que ho sabia.",
                "I tant que sí!",
-               "Sí, estic d’acord amb tu.",
+               "Sí, estic d'acord amb tu.",
                "Sí, és veritat."
            ]},
     "si": {"categoria": "conjunció condicional",
@@ -327,13 +408,13 @@ monosilabos = {
            "ejemplos": [
                "Si plou, ens quedem a casa.",
                "Si estudies, aprovaràs.",
-               "Si vols, t’ajude.",
+               "Si vols, t'ajude.",
                "Si tens temps, vine demà.",
                "Si no ho proves, mai ho sabràs."
            ]},
 
     "més": {"categoria": "quantificador/comparatiu",
-            "definicion": "Comparatiu de quantitat (‘més = más’).",
+            "definicion": "Comparatiu de quantitat ('més = más').",
             "ejemplos": [
                 "Vull més aigua.",
                 "Açò és més car que allò.",
@@ -349,20 +430,20 @@ monosilabos = {
                 "Cada mes estalvie un poc.",
                 "Aquest mes començarem.",
                 "El pròxim mes hi haurà vacances.",
-                "És el mes més llarg de l’any."
+                "És el mes més llarg de l'any."
             ]},
 
     "bé": {"categoria": "adverbi",
-           "definicion": "Adverbi (‘bé = bien’).",
+           "definicion": "Adverbi ('bé = bien').",
            "ejemplos": [
                "Estic bé, gràcies.",
                "Fes-ho bé, si us plau.",
-               "No m’ha paregut bé.",
+               "No m'ha paregut bé.",
                "Treballa molt bé sota pressió.",
                "Tot ha eixit bé al final."
            ]},
     "be": {"categoria": "nom (animal jove)",
-           "definicion": "Nom: ‘corder’, ‘ovella jove’.",
+           "definicion": "Nom: 'corder', 'ovella jove'.",
            "ejemplos": [
                "Va comprar un be al mercat.",
                "El be pastura al camp.",
@@ -372,7 +453,7 @@ monosilabos = {
            ]},
 
     "déu": {"categoria": "nom propi (entitat divina)",
-            "definicion": "Nom: ‘déu = dios’.",
+            "definicion": "Nom: 'déu = dios'.",
             "ejemplos": [
                 "Crec en un sol Déu.",
                 "El Déu dels antics era venerat.",
@@ -380,8 +461,8 @@ monosilabos = {
                 "Van construir un temple dedicat a Déu.",
                 "Déu és omnipotent segons la fe."
             ]},
-    "deu": {"categoria": "numeral / forma de ‘deure’",
-            "definicion": "Nombre ‘deu = diez’ o forma de ‘deure’ (ha/han de).",
+    "deu": {"categoria": "numeral / forma de 'deure'",
+            "definicion": "Nombre 'deu = diez' o forma de 'deure' (ha/han de).",
             "ejemplos": [
                 "En té deu cromos.",
                 "Deu estudiar més per a aprovar.",
@@ -390,8 +471,8 @@ monosilabos = {
                 "Deu treballar molt per aconseguir-ho."
             ]},
 
-    "és": {"categoria": "verb ‘ser’ (3a sing.)",
-           "definicion": "Forma verbal del verb ‘ser’.",
+    "és": {"categoria": "verb 'ser' (3a sing.)",
+           "definicion": "Forma verbal del verb 'ser'.",
            "ejemplos": [
                "Ell és professor.",
                "La casa és gran.",
@@ -411,16 +492,16 @@ monosilabos = {
            ]},
 
     "mà": {"categoria": "nom (part del cos)",
-           "definicion": "Part del cos (‘mà = mano’).",
+           "definicion": "Part del cos ('mà = mano').",
            "ejemplos": [
                "La mà em fa mal.",
-               "Agafa’m de la mà.",
-               "Dóna’m la mà.",
+               "Agafa'm de la mà.",
+               "Dóna'm la mà.",
                "Alça la mà per preguntar.",
                "Va escriure amb la mà esquerra."
            ]},
     "ma": {"categoria": "adjectiu possessiu",
-           "definicion": "Adjectiu possessiu (‘ma = mi’).",
+           "definicion": "Adjectiu possessiu ('ma = mi').",
            "ejemplos": [
                "Ma casa és la teua.",
                "Ma mare treballa ací.",
@@ -430,7 +511,7 @@ monosilabos = {
            ]},
 
     "món": {"categoria": "nom",
-            "definicion": "‘Món = mundo’.",
+            "definicion": "'Món = mundo'.",
             "ejemplos": [
                 "El món és gran.",
                 "Viatjar pel món és enriquidor.",
@@ -439,7 +520,7 @@ monosilabos = {
                 "Tot el món ho sap."
             ]},
     "mon": {"categoria": "possessiu arcaic",
-            "definicion": "Possessiu arcaic (‘mon = mi’).",
+            "definicion": "Possessiu arcaic ('mon = mi').",
             "ejemplos": [
                 "Mon pare treballa al camp.",
                 "Mon oncle viu lluny.",
@@ -447,17 +528,18 @@ monosilabos = {
                 "Mon avi sempre conta històries.",
                 "Mon germà juga al futbol."
             ]},
-  "pèl": {"categoria": "nom",
-            "definicion": "‘Pèl = pelo, cabell’ (filament).",
+
+    "pèl": {"categoria": "nom",
+            "definicion": "'Pèl = pelo, cabell' (filament).",
             "ejemplos": [
                 "Tens un pèl al jersei.",
                 "El gat ha deixat pèl al sofà.",
-                "Se m’ha caigut un pèl.",
+                "Se m'ha caigut un pèl.",
                 "El pèl és molt fi.",
                 "Els gossos muden el pèl a la primavera."
             ]},
-    "pel": {"categoria": "contracció (‘per el’)",
-            "definicion": "Contracció de ‘per el’.",
+    "pel": {"categoria": "contracció ('per el')",
+            "definicion": "Contracció de 'per el'.",
             "ejemplos": [
                 "Passe pel carrer major.",
                 "Vaig pel camí antic.",
@@ -485,8 +567,8 @@ monosilabos = {
                 "És el projecte que esperàvem."
             ]},
 
-    "sé": {"categoria": "verb ‘saber’ (1a sing.)",
-           "definicion": "Forma verbal de ‘saber’.",
+    "sé": {"categoria": "verb 'saber' (1a sing.)",
+           "definicion": "Forma verbal de 'saber'.",
            "ejemplos": [
                "Jo sé la resposta.",
                "No sé què dir-te.",
@@ -497,15 +579,15 @@ monosilabos = {
     "se": {"categoria": "pronom",
            "definicion": "Pronom personal.",
            "ejemplos": [
-               "Se’n va anar de pressa.",
+               "Se'n va anar de pressa.",
                "Se sent feliç.",
-               "Se’n recorda sovint.",
-               "Se n’anà corrent.",
+               "Se'n recorda sovint.",
+               "Se n'anà corrent.",
                "Se sorprengué amb la notícia."
            ]},
 
     "sòl": {"categoria": "nom (terra ferma/suelo)",
-            "definicion": "‘Sòl = suelo, terra ferma’.",
+            "definicion": "'Sòl = suelo, terra ferma'.",
             "ejemplos": [
                 "El sòl està mullat.",
                 "No poses això al sòl.",
@@ -513,18 +595,18 @@ monosilabos = {
                 "El sòl de la cuina és nou.",
                 "El sòl forestal és ric en nutrients."
             ]},
-    "sol": {"categoria": "nom (astre) / adjectiu (‘sol = a soles’)",
-            "definicion": "Nom (astre ‘sol’) o adjectiu (‘sol = solo’).",
+    "sol": {"categoria": "nom (astre) / adjectiu ('sol = a soles')",
+            "definicion": "Nom (astre 'sol') o adjectiu ('sol = solo').",
             "ejemplos": [
                 "El sol brilla.",
                 "Estic sol a casa.",
                 "Prefereix estar sol.",
                 "El sol escalfa la terra.",
-                "El sol es pon a l’oest."
+                "El sol es pon a l'oest."
             ]},
 
-    "són": {"categoria": "verb ‘ser’ (3a pl.)",
-            "definicion": "Forma verbal de ‘ser’ (3a persona plural).",
+    "són": {"categoria": "verb 'ser' (3a pl.)",
+            "definicion": "Forma verbal de 'ser' (3a persona plural).",
             "ejemplos": [
                 "Ells són amics.",
                 "Les cases són grans.",
@@ -533,17 +615,17 @@ monosilabos = {
                 "Són de València."
             ]},
     "son": {"categoria": "nom (somnolència)",
-            "definicion": "‘Son = sueño, ganes de dormir’.",
+            "definicion": "'Son = sueño, ganes de dormir'.",
             "ejemplos": [
                 "Tinc son.",
-                "El bebé té son.",
+                "El bebè té son.",
                 "Em fa son llegir.",
                 "Ell té molta son.",
                 "Després de dinar em ve son."
             ]},
 
-    "té": {"categoria": "verb ‘tindre’ (3a sing.)",
-           "definicion": "Forma verbal de ‘tindre’.",
+    "té": {"categoria": "verb 'tindre' (3a sing.)",
+           "definicion": "Forma verbal de 'tindre'.",
            "ejemplos": [
                "Ella té un cotxe.",
                "El xic té gana.",
@@ -552,26 +634,26 @@ monosilabos = {
                "Té molta sort."
            ]},
     "te": {"categoria": "pronom / nom (beguda)",
-           "definicion": "Pronom (‘a tu’) o beguda (‘te’).",
+           "definicion": "Pronom ('a tu') o beguda ('te').",
            "ejemplos": [
                "Això és per a te.",
                "Vull un te calent.",
-               "El te verd m’agrada.",
+               "El te verd m'agrada.",
                "Beu un te amb llet.",
-               "Regala’m un te d’herbes."
+               "Regala'm un te d'herbes."
            ]},
 
     "ús": {"categoria": "nom",
-           "definicion": "‘Ús = utilización’ d’alguna cosa.",
+           "definicion": "'Ús = utilización' d'alguna cosa.",
            "ejemplos": [
-               "L’ús del mòbil està regulat.",
+               "L'ús del mòbil està regulat.",
                "Fa ús del diccionari.",
-               "En limita l’ús.",
-               "L’ús de plàstic ha disminuït.",
-               "Estudia l’ús correcte dels verbs."
+               "En limita l'ús.",
+               "L'ús de plàstic ha disminuït.",
+               "Estudia l'ús correcte dels verbs."
            ]},
     "us": {"categoria": "pronom (a vosaltres)",
-           "definicion": "Pronom personal (‘a vosaltres’).",
+           "definicion": "Pronom personal ('a vosaltres').",
            "ejemplos": [
                "Us espere a la porta.",
                "Ja us he vist.",
@@ -590,7 +672,7 @@ monosilabos = {
                 "Vós sereu recordat sempre."
             ]},
     "vos": {"categoria": "pronom (a vosaltres)",
-            "definicion": "Pronom personal (‘a vosaltres’).",
+            "definicion": "Pronom personal ('a vosaltres').",
             "ejemplos": [
                 "Vos estime molt.",
                 "Vos ajudaré en tot.",
@@ -599,7 +681,6 @@ monosilabos = {
                 "Vos vaig escriure un missatge."
             ]},
 }
-
 
 pares = [
     ("bé", "be"),
@@ -624,13 +705,54 @@ for acent, sense in pares:
     parelles[acent] = sense
     parelles[sense] = acent
 
+# 4. AHORA SÍ podemos usar las funciones en el bloque try
+try:
+    logger.info("Iniciando aplicación...")
+    
+    # Inicializar estado de sesión
+    init_session_state()
+    
+    # Configuración de página
+    st.set_page_config(
+        page_title="📘 Monosíl·labs: accents diacrítics en valencià",
+        page_icon="📘",
+        layout="centered",
+        initial_sidebar_state="expanded",
+        menu_items={
+            'Get Help': None,
+            'Report a bug': None,
+            'About': None
+        }
+    )
+    
+    # Inyectar CSS personalizado
+    inject_custom_css()
+
+except Exception as e:
+    st.error(f"Error en la aplicación: {str(e)}")
+    logger.exception("Error en la aplicación")
+    raise
+
+# Inyectar CSS personalizado AL INICIO
+inject_custom_css()
+col_title, col_theme = st.columns([4, 1])
+
+with col_title:
+    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
+    st.caption("Consulta definicions, exemples i parelles")
+        
+with st.expander("Saps què és un monosíl·lab?"):
+    st.markdown(
+        "**Monosíl·lab**: paraula d'una sola síl·laba.\n\n"
+        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
+        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
+    )
+
 # ===========================
 # Estado de sesión
 # ===========================
 if "historial" not in st.session_state:
     st.session_state.historial = []
-    
-# Estat per al quiz
 if "quiz" not in st.session_state:
     st.session_state.quiz = None
 if "quiz_n" not in st.session_state:
@@ -649,21 +771,26 @@ MENU_RANK = "🏆 Rànquing"
 
 # Valor por defecto del menú si no existe aún
 if "menu" not in st.session_state:
-    st.session_state["menu"] = "🔎 Cerca un monosíl·lab"
+    st.session_state["menu"] = "🔍 Cerca un monosíl·lab"
 
 with st.sidebar:
     st.header("📋 Menú")
 
     # Indicador de tema actual
-    theme_status = "🌙 Tema fosc" if st.session_state.get("dark_mode", False) else "☀️ Tema clar"
-    st.caption(theme_status)
+    theme_icon = "☀️" if st.session_state.dark_mode else "🌙"
+    theme_text = "Canviar a tema clar" if st.session_state.dark_mode else "Canviar a tema fosc"
+    
+    if st.button(f"{theme_icon} {theme_text}", key="theme_toggle"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        inject_custom_css()
+        st.rerun()
 
     # El radio lee/escribe directamente en session_state["menu"]
     st.radio(
         "Acció",
         [
-            "🔎 Cerca un monosíl·lab",
-            "📃 Llista",
+            "🔍 Cerca un monosíl·lab",
+            "🃏 Llista",
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
@@ -699,8 +826,8 @@ opcio = st.session_state["menu"]
 # ===========================
 # Vistas
 # ===========================
-if opcio == "🔎 Cerca un monosíl·lab":
-    st.header("🔎 Cerca un monosíl·lab")
+if opcio == "🔍 Cerca un monosíl·lab":
+    st.header("🔍 Cerca un monosíl·lab")
     paraula_input = st.text_input(
         "Escriu el monosíl·lab (amb o sense accent):",
         placeholder="Ex: més, que, sí..."
@@ -727,9 +854,7 @@ if opcio == "🔎 Cerca un monosíl·lab":
             else:
                 st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
 
-
-
-elif opcio == "📃 Llista":
+elif opcio == "🃏 Llista":
     st.header("Monosíl·labs disponibles (en parelles)")
     for acent, sense in pares:
         st.markdown(f"- {color_word(acent)} / {color_word(sense)}")
@@ -850,7 +975,7 @@ elif opcio == "📝 Mini-quiz":
         else:
             st.warning(f"⚠️ Respon totes les preguntes per corregir. ({answered_count}/{len(quiz['preguntas'])} respostes)")
 
-                # -------- Panel post-correcció (estable en rerun) --------
+        # -------- Panel post-corrección (estable en rerun) --------
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
             correctes = score.get("puntuacio", 0)
@@ -896,12 +1021,11 @@ elif opcio == "📝 Mini-quiz":
                     rerun_safe()
 
             with colC:
-                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+                if st.button("📝 Nou quiz", key="btn_new_quiz_after"):
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
                     rerun_safe()
-
 
 elif opcio == "🏆 Rànquing":
     import pandas as pd
@@ -915,7 +1039,10 @@ elif opcio == "🏆 Rànquing":
         rerun_safe()
 
     # Leer datos
-    scores, _ = load_scores_from_github()
+    try:
+        scores, _ = load_scores_from_github()
+    except:
+        scores = []
 
     if not scores:
         st.info("Encara no hi ha puntuacions al rànquing.")
@@ -947,11 +1074,8 @@ elif opcio == "🏆 Rànquing":
                 "%": round(100 * num / den),
                 "Data": r.get("data", "—"),
             })
-
         df = pd.DataFrame(rows)
-
         st.dataframe(df, hide_index=True, use_container_width=True)
-
         # Descarga CSV (asegúrate de crear df ANTES de este botón)
         csv = df.to_csv(index=False).encode("utf-8")
         st.download_button(
@@ -961,38 +1085,3 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
