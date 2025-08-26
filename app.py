@@ -709,6 +709,7 @@ elif opcio == "📝 Mini-quiz":
             }
 
         # -------- Panel post-correcció (estable en rerun) --------
+                # -------- Panel post-correcció (estable en rerun) --------
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
             correctes = score.get("puntuacio", 0)
@@ -724,27 +725,24 @@ elif opcio == "📝 Mini-quiz":
             )
             data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-            # 👇 A PARTIR DE AQUÍ TODO VA DENTRO DEL MISMO if, BIEN INDENTADO
+            # 👇 columnas y botones, todo dentro del mismo if y bien indentado
             colA, colB, colC = st.columns([1, 1, 1])
 
             with colA:
                 if st.button("💾 Guardar rànquing", key="btn_save_rank"):
-                    # Construimos el registro con el nombre actual
                     record = {
                         "nom": st.session_state.last_score.get("nom", ""),
                         "puntuacio": correctes,
                         "total": total,
                         "data": data_str,
                     }
-                    # Guarda en sesión
                     if "scores" not in st.session_state:
                         st.session_state.scores = []
                     st.session_state.scores.append(record)
                     st.success("Resultat guardat en la sessió.")
-                    # Guarda en GitHub (si tienes secrets configurados)
                     try:
                         if "append_score_to_github" in globals():
-                            ok = append_score_to_github(record)  # este helper ya limpia la caché
+                            ok = append_score_to_github(record)
                             if ok:
                                 st.success("Rànquing a GitHub actualitzat.")
                             else:
@@ -752,14 +750,13 @@ elif opcio == "📝 Mini-quiz":
                     except Exception as e:
                         st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-           with colB:
+            with colB:
                 if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["menu"] = MENU_RANK  # ← misma constante que en el sidebar
+                    st.session_state["menu"] = MENU_RANK
                     rerun_safe()
 
             with colC:
                 if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
-                    # Reset estado post-corrección y genera otro quiz
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
@@ -824,6 +821,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
