@@ -14,37 +14,6 @@ st.set_page_config(
     layout="centered",
     initial_sidebar_state="expanded"
 )
-
-# Inyectar CSS personalizado AL INICIO
-inject_custom_css()
-col_title, col_theme = st.columns([4, 1])
-
-with col_title:
-    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
-    st.caption("Consulta definicions, exemples i parelles")
-
-with col_theme:
-    # Toggle tema oscuro
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False
-    
-    theme_icon = "🌙" if not st.session_state.dark_mode else "☀️"
-    theme_text = "Fosc" if not st.session_state.dark_mode else "Clar"
-    
-    if st.button(f"{theme_icon} {theme_text}", help="Canviar tema"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        st.rerun()
-        
-with st.expander("Saps què és un monosíl·lab?"):
-    st.markdown(
-        "**Monosíl·lab**: paraula d’una sola síl·laba.\n\n"
-        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
-        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
-    )
-# ===========================
-# Utilidades
-# ===========================
-
 def inject_custom_css():
     """CSS personalizado con soporte para tema oscuro"""
     dark_mode = st.session_state.get("dark_mode", False)
@@ -110,24 +79,43 @@ def inject_custom_css():
         </style>
         """, unsafe_allow_html=True)
 
-def show_quiz_progress(current: int, total: int, answered: int):
-    """Muestra barra de progreso del quiz"""
-    progress = answered / total
+# Inyectar CSS personalizado AL INICIO
+inject_custom_css()
+col_title, col_theme = st.columns([4, 1])
+
+with col_title:
+    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
+    st.caption("Consulta definicions, exemples i parelles")
+
+with col_theme:
+    # Toggle tema oscuro
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False
     
-    st.markdown("""
-    <div class="quiz-progress">
-    """, unsafe_allow_html=True)
+    theme_icon = "🌙" if not st.session_state.dark_mode else "☀️"
+    theme_text = "Fosc" if not st.session_state.dark_mode else "Clar"
     
-    col1, col2, col3 = st.columns([2, 1, 1])
-    
-    with col1:
-        st.progress(progress)
-    with col2:
-        st.metric("Pregunta", f"{current}/{total}")
-    with col3:
-        st.metric("Respostes", f"{answered}/{total}")
-    
-    st.markdown("</div>", unsafe_allow_html=True)
+    if st.button(f"{theme_icon} {theme_text}", help="Canviar tema"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+        
+with st.expander("Saps què és un monosíl·lab?"):
+    st.markdown(
+        "**Monosíl·lab**: paraula d’una sola síl·laba.\n\n"
+        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
+        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
+    )
+# ===========================
+# Utilidades
+# ===========================
+
+
+
+def show_quiz_progress(current_question: int, total_questions: int):
+    """Muestra progreso del quiz"""
+    progress = current_question / total_questions
+    st.progress(progress)
+    st.caption(f"Pregunta {current_question} de {total_questions}")
 
     
 def _is_accented(word: str) -> bool:
@@ -653,6 +641,9 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
+if st.session_state.get("__nav_target__"):
+    st.session_state["menu"] = st.session_state.pop("__nav_target__")
+    
 with st.sidebar:
     st.header("📋 Menú")
     
@@ -663,18 +654,19 @@ with st.sidebar:
     opcio = st.radio(
         "Acció",
         [
-            "🔍 Cerca un monosíl·lab",
+            "🔎 Cerca un monosíl·lab",
             "📃 Llista",
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
             "🏆 Rànquing",
-            "⭐ Favorites"  # Nueva opción
+        
         ],
         index=0
     )
     
     st.divider()
+    opcio = st.session_state["menu"]
     
     # Estadísticas rápidas
     st.caption("📊 **Estadístiques ràpides**")
@@ -697,7 +689,7 @@ with st.sidebar:
 # Vistas
 # ===========================
 if opcio == "🔎 Cerca un monosíl·lab":
-    st.header("Cerca un monosíl·lab")
+    st.header("🔎 Cerca un monosíl·lab")
     paraula_input = st.text_input(
         "Escriu el monosíl·lab (amb o sense accent):",
         placeholder="Ex: més, que, sí..."
@@ -909,10 +901,13 @@ elif opcio == "📝 Mini-quiz":
                     except Exception as e:
                         st.info(f"GitHub no disponible: {str(e)[:50]}...")
 
-            with colB:
+         with colB:
                 if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["temp_redirect"] = "🏆 Rànquing"
-                    st.rerun()
+                    st.session_state["__nav_target__"] = MENU_RANK
+                    try:
+                        st.rerun()
+                    except Exception:
+                        st.experimental_rerun()
 
             with colC:
                 if st.button("🔄 Nou quiz", key="btn_new_quiz_after"):
@@ -980,6 +975,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
