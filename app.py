@@ -772,8 +772,7 @@ elif opcio == "📝 Mini-quiz":
                 "nom": st.session_state.get("last_score", {}).get("nom", ""),
             }
 
-        # -------- Panel post-correcció (estable en rerun) --------
-                # -------- Panel post-correcció (estable en rerun) --------
+                  # -------- Panel post-correcció (estable en rerun) --------
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
             correctes = score.get("puntuacio", 0)
@@ -789,7 +788,7 @@ elif opcio == "📝 Mini-quiz":
             )
             data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-            # 👇 columnas y botones, todo dentro del mismo if y bien indentado
+            # 👇 columnas y botones, todo dentro del mismo if y alineado igual
             colA, colB, colC = st.columns([1, 1, 1])
 
             with colA:
@@ -814,10 +813,10 @@ elif opcio == "📝 Mini-quiz":
                     except Exception as e:
                         st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-         with colB:
-            if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                st.session_state["__nav_target__"] = MENU_RANK  # p.ej. MENU_RANK = "🏆 Rànquing"
-                rerun_safe()
+            with colB:
+                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+                    st.session_state["__nav_target__"] = MENU_RANK
+                    rerun_safe()
 
             with colC:
                 if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
@@ -885,6 +884,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
