@@ -708,55 +708,59 @@ elif opcio == "📝 Mini-quiz":
             )
             data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-colA, colB, colC = st.columns([1, 1, 1])
+            # 👇 A PARTIR DE AQUÍ TODO VA DENTRO DEL MISMO if, BIEN INDENTADO
+            colA, colB, colC = st.columns([1, 1, 1])
 
-with colA:
-    if st.button("💾 Guardar rànquing", key="btn_save_rank"):
-        # Construimos el registro con el nombre actual
-        record = {
-            "nom": st.session_state.last_score.get("nom", ""),
-            "puntuacio": correctes,
-            "total": total,
-            "data": data_str,
-        }
-        # Guarda en sesión
-        if "scores" not in st.session_state:
-            st.session_state.scores = []
-        st.session_state.scores.append(record)
-        st.success("Resultat guardat en la sessió.")
-        # Guarda en GitHub (si tienes secrets configurados)
-        try:
-            if "append_score_to_github" in globals():
-                ok = append_score_to_github(record)  # este helper ya limpia la caché
-                if ok:
-                    st.success("Rànquing a GitHub actualitzat.")
-                else:
-                    st.info("No s'ha pogut guardar a GitHub.")
-        except Exception as e:
-            st.info(f"No s'ha pogut guardar a GitHub: {e}")
+            with colA:
+                if st.button("💾 Guardar rànquing", key="btn_save_rank"):
+                    # Construimos el registro con el nombre actual
+                    record = {
+                        "nom": st.session_state.last_score.get("nom", ""),
+                        "puntuacio": correctes,
+                        "total": total,
+                        "data": data_str,
+                    }
+                    # Guarda en sesión
+                    if "scores" not in st.session_state:
+                        st.session_state.scores = []
+                    st.session_state.scores.append(record)
+                    st.success("Resultat guardat en la sessió.")
+                    # Guarda en GitHub (si tienes secrets configurados)
+                    try:
+                        if "append_score_to_github" in globals():
+                            ok = append_score_to_github(record)  # este helper ya limpia la caché
+                            if ok:
+                                st.success("Rànquing a GitHub actualitzat.")
+                            else:
+                                st.info("No s'ha pogut guardar a GitHub.")
+                    except Exception as e:
+                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-with colB:
-    if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-        # Solo navegación, sin guardar
-        st.session_state["menu"] = "🏆 Rànquing"
-        rerun_safe()
+            with colB:
+                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+                    # Solo navegación, sin guardar
+                    st.session_state["menu"] = "🏆 Rànquing"
+                    rerun_safe()
 
-with colC:
-    if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
-        # Reset estado post-corrección y genera otro quiz
-        st.session_state.quiz_corrected = False
-        st.session_state.last_score = {}
-        st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-        rerun_safe()
+            with colC:
+                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+                    # Reset estado post-corrección y genera otro quiz
+                    st.session_state.quiz_corrected = False
+                    st.session_state.last_score = {}
+                    st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
+                    rerun_safe()
 
 
 elif opcio == "🏆 Rànquing":
+    import pandas as pd
+    from datetime import datetime
+
     st.header("🏆 Rànquing")
 
     # Botón de refresco (limpia caché y relee)
- if st.button("🔄 Actualitza rànquing ara"):
-    st.cache_data.clear()
-    rerun_safe()
+    if st.button("🔄 Actualitza rànquing ara"):
+        st.cache_data.clear()
+        rerun_safe()
 
     # Leer datos
     scores, _ = load_scores_from_github()
@@ -765,7 +769,7 @@ elif opcio == "🏆 Rànquing":
         st.info("Encara no hi ha puntuacions al rànquing.")
     else:
         # Orden: % y fecha desc
-        def pct(r): 
+        def pct(r):
             den = max(1, r.get("total", 1))
             return (r.get("puntuacio", 0) / den)
 
@@ -806,12 +810,12 @@ elif opcio == "🏆 Rànquing":
             key="btn_download_rank"
         )
 
-
 # ——— Redirecció automàtica al rànquing després del quiz ———
 if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
