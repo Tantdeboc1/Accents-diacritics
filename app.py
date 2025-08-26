@@ -2,9 +2,9 @@
 import streamlit as st
 import unicodedata
 import re
-import unicodedata
 from datetime import datetime
 import random
+import json, base64, requests, time
 # ===========================
 # Configuración de página
 # ===========================
@@ -112,12 +112,66 @@ def generar_preguntas(n=10):
         if len(preguntas) >= n:
             break
     return preguntas
+    
+def render_ranking_sidebar(max_rows=10):
+    """
+    Muestra el ránquing en la barra lateral dentro de un expander.
+    Ordena por % de aciertos y por fecha (desc).
+    """
+    import pandas as pd
+    from datetime import datetime
+
+    def parse_dt(s: str):
+        # intenta "YYYY-MM-DD HH:MM"; si falla, usa fecha mínima
+        try:
+            return datetime.strptime(s, "%Y-%m-%d %H:%M")
+        except Exception:
+            return datetime.min
+
+    with st.sidebar.expander("🏆 Rànquing", expanded=False):
+        scores, _ = load_scores_from_github()
+
+        if not scores:
+            st.caption("Encara no hi ha puntuacions.")
+            if st.button("🔄 Actualitza", key="rank_refresh_empty"):
+                st.cache_data.clear()
+            return
+
+        # Orden principal: % aciertos; secundaria: fecha
+        def pct(r):
+            num = r.get("puntuacio", 0)
+            den = max(1, r.get("total", 1))
+            return num / den
+
+        scores_sorted = sorted(
+            scores,
+            key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
+            reverse=True
+        )
+
+        # Construimos filas
+        rows = []
+        for i, r in enumerate(scores_sorted[:max_rows], start=1):
+            num = r.get("puntuacio", 0)
+            den = max(1, r.get("total", 1))
+            perc = int(round(100 * num / den))
+            rows.append({
+                "#": i,
+                "Nom": str(r.get("nom", "—"))[:14],
+                "Punts": f"{num}/{den}",
+                "%": perc,
+                "Data": r.get("data", "—"),
+            })
+
+        df = pd.DataFrame(rows)
+        st.dataframe(df, hide_index=True, use_container_width=True)
+
+        # Botón de refresco manual (por si has guardado una puntuación hace nada)
+        if st.button("🔄 Actualitza rànquing", key="rank_refresh_btn"):
+            st.cache_data.clear()
 
 # ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
-import json, base64, requests, time
-
 def _gh_headers():
-    import streamlit as st
     return {
         "Authorization": f"Bearer {st.secrets['GITHUB_TOKEN']}",
         "Accept": "application/vnd.github+json",
@@ -125,25 +179,26 @@ def _gh_headers():
     }
 
 def _gh_file_url():
-    import streamlit as st
     owner_repo = st.secrets["GITHUB_REPO"]
     branch = st.secrets.get("GITHUB_BRANCH", "main")
     path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
     return f"https://api.github.com/repos/{owner_repo}/contents/{path}?ref={branch}"
 
 def _gh_put_url():
-    import streamlit as st
     owner_repo = st.secrets["GITHUB_REPO"]
     path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
     return f"https://api.github.com/repos/{owner_repo}/contents/{path}"
 
+@st.cache_data(ttl=60)  # 👈 Cachea la lectura 60s (ajusta el ttl si quieres)
 def load_scores_from_github():
-    """Llig el JSONL del repo. Torna (scores:list, sha:str|None). Si no existeix, ([], None)."""
-    import streamlit as st
+    """
+    Lee el JSONL del repo.
+    Devuelve (scores:list, sha:str|None). Si no existe, ([], None).
+    """
     try:
         r = requests.get(_gh_file_url(), headers=_gh_headers(), timeout=10)
         if r.status_code == 404:
-            return [], None  # fitxer no creat encara
+            return [], None  # fichero aún no creado
         r.raise_for_status()
         data = r.json()
         content_b64 = data["content"]
@@ -155,19 +210,17 @@ def load_scores_from_github():
                 scores.append(json.loads(line))
         return scores, sha
     except Exception as e:
-        st = __import__("streamlit")
-        st.error(f"Error llegint rànquing de GitHub: {e}")
+        st.error(f"Error leyendo ránking de GitHub: {e}")
         return [], None
 
 def append_score_to_github(record: dict, max_retries=3):
     """
-    Afig un registre al JSONL en GitHub amb control de conflictes.
-    Flux:
-      - GET: llegir contingut i sha
-      - APPEND: afegir línia
-      - PUT: pujar amb sha
+    Añade un registro al JSONL en GitHub con control de conflictos.
+    Flujo:
+      - GET: leer contenido y sha
+      - APPEND: añadir línea
+      - PUT: subir con sha (si existe)
     """
-    import streamlit as st
     for attempt in range(max_retries):
         scores, sha = load_scores_from_github()
         lines = [json.dumps(s, ensure_ascii=False) for s in scores]
@@ -185,15 +238,19 @@ def append_score_to_github(record: dict, max_retries=3):
         try:
             r = requests.put(_gh_put_url(), headers=_gh_headers(), json=payload, timeout=15)
             if r.status_code in (200, 201):
+                # ✅ Guardado correcto → vaciamos la caché de lectura para ver el cambio al instante
+                st.cache_data.clear()
                 return True
-            if r.status_code == 409:  # conflicte: el fitxer ha canviat; reintentar
+            if r.status_code == 409:  # conflicto: el fichero ha cambiado; reintentar
                 time.sleep(0.8)
                 continue
             r.raise_for_status()
+            # si llega aquí sin excepción, lo consideramos OK por seguridad
+            st.cache_data.clear()
             return True
         except Exception as e:
             if attempt == max_retries - 1:
-                st.error(f"No s'ha pogut guardar al rànquing (GitHub): {e}")
+                st.error(f"No se ha podido guardar en el ránking (GitHub): {e}")
                 return False
             time.sleep(0.8)
     return False
@@ -536,13 +593,17 @@ with st.sidebar:
     st.header("Menú")
     opcio = st.radio(
         "Acció",
-        ["🔎 Cerca un monosíl·lab", "📃 Llista", "📚 Llista detallada", "🕘 Historial", "📝 Mini-quiz"],
+        [
+            "🔎 Cerca un monosíl·lab",
+            "📃 Llista",
+            "📚 Llista detallada",
+            "🕘 Historial",
+            "📝 Mini-quiz",
+            "🏆 Rànquing"          
+        ],
         index=0
     )
     st.divider()
-# Marca de versió automàtica
-
-with st.sidebar:
     st.info(f"Versió de l’app: {datetime.now():%Y-%m-%d %H:%M:%S}")
 # ===========================
 # Vistas
@@ -610,62 +671,33 @@ elif opcio == "🕘 Historial":
 elif opcio == "📝 Mini-quiz":
     st.header("Mini-quiz: tria la forma correcta")
 
-    # -------- Estat inicial necessari --------
+    # -------- Estado inicial necesario --------
     if "quiz" not in st.session_state:
         st.session_state.quiz = None
     if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10  # valor per defecte
+        st.session_state.quiz_n = 10  # valor por defecte
     if "scores" not in st.session_state:
-        st.session_state.scores = []  # {"nom":..., "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
-    if "last_score_sig" not in st.session_state:
-        st.session_state.last_score_sig = None
+        st.session_state.scores = []  # {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
 
-    # -------- Selector nº de preguntes + botó "nou quiz" --------
+    quiz = st.session_state.quiz
+
+    # -------- Selector nº de preguntes + botón nuevo quiz --------
     col_sel, col_btn = st.columns([1, 1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
             "Nombre de preguntes",
             options=[5, 10, 20],
             index=[5, 10, 20].index(st.session_state.get("quiz_n", 10)),
-            help="Tria quantes preguntes vols per al quiz."
+            help="Tria quantes preguntes vols que tinga el quiz."
         )
     with col_btn:
-        if st.button(f"🔁 Nou quiz ({st.session_state.quiz_n} preguntes)", key="btn_new_quiz_top"):
-            preg = generar_preguntas(st.session_state.quiz_n)
-            if not preg:
-                st.error("No s'han pogut generar preguntes. Revisa que els exemples continguen la paraula exacta.")
-            else:
-                st.session_state.quiz = {
-                    "preguntas": preg,
-                    "respuestas": [None] * len(preg),
-                    "terminado": False,
-                    "guardat": False
-                }
+        if st.button("Nou quiz"):
+            quiz = generar_quiz(st.session_state.quiz_n)
+            st.session_state.quiz = quiz
 
-    quiz = st.session_state.quiz
-
-    # -------- Si no hi ha quiz, indicació + diagnòstic opcional --------
+    # -------- Si no hi ha quiz, indicació --------
     if not quiz:
         st.info("Prem **Nou quiz** per a començar.")
-
-        # Diagnòstic GitHub (opcional)
-        with st.expander("Diagnòstic GitHub", expanded=False):
-            has_token = "GITHUB_TOKEN" in st.secrets
-            has_repo  = "GITHUB_REPO" in st.secrets
-            st.write("Token present:", "✅" if has_token else "❌")
-            st.write("Repo configurat:", "✅" if has_repo else "❌")
-            if has_repo:
-                st.write("Repo →", st.secrets["GITHUB_REPO"])
-                st.write("Branch →", st.secrets.get("GITHUB_BRANCH","main"))
-                st.write("Path →", st.secrets.get("GITHUB_SCORES_PATH","scores.jsonl"))
-            if st.button("🔧 Prova guardat a GitHub", key="btn_test_github"):
-                from datetime import datetime
-                rec = {"nom":"TEST","puntuacio":1,"total":1,"data":datetime.now().strftime("%Y-%m-%d %H:%M")}
-                if "append_score_to_github" not in globals():
-                    st.error("No trobe append_score_to_github(). Has pegat els helpers?")
-                else:
-                    ok = append_score_to_github(rec)
-                    st.success("OK! S'ha creat/actualitzat scores.jsonl.") if ok else st.error("No s'ha pogut escriure. Mira Logs.")
     else:
         # -------- Render de preguntes (2 opcions en desplegable) --------
         for i, q in enumerate(quiz["preguntas"]):
@@ -679,154 +711,105 @@ elif opcio == "📝 Mini-quiz":
             quiz["respuestas"][i] = seleccion if seleccion != "—" else None
             st.write("")
 
-        # -------- Botó d'enviament --------
-        if not quiz["terminado"]:
-            if st.button("✅ Enviar respostes", key="btn_submit_quiz"):
-                quiz["terminado"] = True
-
-        # -------- Correcció i feedback --------
-        if quiz["terminado"]:
-            contestades = sum(1 for r in quiz["respuestas"] if r is not None)
-            if contestades < len(quiz["preguntas"]):
-                st.warning(f"Has deixat {len(quiz['preguntas']) - contestades} sense contestar.")
-
-            correctes = 0
-            fallos = []
-            for i, q in enumerate(quiz["preguntas"]):
-                if quiz["respuestas"][i] == q["correcta"]:
-                    correctes += 1
-                else:
-                    fallos.append((i, q, quiz["respuestas"][i]))
-
+        # -------- Botó per corregir --------
+        if st.button("Corregir"):
+            correctes = sum(
+                r == q["correcta"]
+                for r, q in zip(quiz["respuestas"], quiz["preguntas"])
+                if r
+            )
             total = len(quiz["preguntas"])
-            st.success(f"Puntuació: **{correctes}/{total}**")
+            st.success(f"Has encertat {correctes}/{total}")
 
-            if fallos:
-                st.error("Repàs d'errors:")
-                for i, q, elegida in fallos:
-                    def_ok = monosilabos[q["correcta"]]["definicion"]
-                    def_p = monosilabos[q["pareja"]]["definicion"]
-                    solucio = q["enunciado"].replace("_____", f"**{q['correcta']}**")
-                    st.markdown(
-                        f"- **{i+1}.** {solucio}"
-                        f"<br/>Resposta triada: *{elegida or '—'}*  |  Correcta: **{q['correcta']}**"
-                        f"<br/>· {q['correcta']}: {def_ok}"
-                        f"<br/>· {q['pareja']}: {def_p}",
-                        unsafe_allow_html=True
-                    )
+            # 👇 Nou botó per a veure el rànquing
+            if st.button("🏆 Veure rànquing"):
+                st.session_state["__go_rank__"] = True
 
-            st.divider()
-
-            # -------- Rànquing estil arcade --------
-            st.subheader("🏆 Rànquing (estil arcade)")
-            col_nom, col_guardar = st.columns([2, 1])
-
-            with col_nom:
-                nom_input = st.text_input(
-                    "Escriu el teu nom (5 lletres màx.)",
-                    max_chars=5,
-                    placeholder="p.ex. JOSEP",
-                    help="Nom curt per a la classificació. 1–5 lletres (A–Z)."
-                )
-
-            with col_guardar:
-                from datetime import datetime
-                if st.button("💾 Guardar puntuació", key="btn_save_score", disabled=quiz.get("guardat", False)):
-                    nom_clean = (nom_input or "").strip().upper()
-                    import re
-                    if not re.fullmatch(r"[A-Z]{1,5}", nom_clean):
-                        st.error("Nom invàlid. Usa 1–5 lletres (A–Z), sense espais ni números.")
-                    else:
-                        record = {
-                            "nom": nom_clean,
-                            "puntuacio": correctes,
-                            "total": total,
-                            "data": datetime.now().strftime("%Y-%m-%d %H:%M")
-                        }
-
-                        # Anti-duplicats: firma + marca optimista
-                        sig = f"{record['nom']}-{record['puntuacio']}-{record['total']}"
-                        if st.session_state.last_score_sig == sig:
-                            st.info("Ja has guardat este mateix resultat.")
-                        else:
-                            st.session_state.last_score_sig = sig
-                            quiz["guardat"] = True  # evita doble clic
-
-                            # 1) memòria
-                            st.session_state.scores.append(record)
-
-                            # 2) GitHub (si tens helpers)
-                            ok = True
-                            if "append_score_to_github" in globals():
-                                try:
-                                    ok = append_score_to_github(record)
-                                except Exception:
-                                    ok = False
-
-                            if ok:
-                                st.success("Puntuació guardada al rànquing!")
-                            else:
-                                st.warning("S'ha guardat en memòria, però no a GitHub (torna-ho a intentar).")
-
-            # -------- Mostrar rànquing (Top 10) --------
-            scores_all = st.session_state.scores[:]  # bàsic: memòria
-            if "load_scores_from_github" in globals():
-                try:
-                    scores_remote, _ = load_scores_from_github()
-                    for s in scores_remote:
-                        if s not in scores_all:
-                            scores_all.append(s)
-                except Exception:
-                    pass
-
-            if scores_all:
-                scores_sorted = sorted(
-                    scores_all,
-                    key=lambda x: (x["puntuacio"], x["data"]),
-                    reverse=True
-                )
-
-                st.markdown("**Top 10**")
-                for idx, s in enumerate(scores_sorted[:10], start=1):
-                    barra = "█" * max(1, int(10 * s["puntuacio"] / s["total"]))
-                    st.write(f"{idx:>2}. {s['nom']} — {s['puntuacio']}/{s['total']}  ({s['data']})  {barra}")
-
-                # Descarrega CSV del rànquing actual
-                import io, csv
-                buf = io.StringIO()
-                w = csv.writer(buf)
-                w.writerow(["posicio", "nom", "puntuacio", "total", "data"])
-                for idx, s in enumerate(scores_sorted, start=1):
-                    w.writerow([idx, s["nom"], s["puntuacio"], s["total"], s["data"]])
-                st.download_button(
-                    "⬇️ Descarregar rànquing (CSV)",
-                    buf.getvalue().encode("utf-8"),
-                    file_name="ranquing_quiz.csv",
-                    mime="text/csv",
-                    key="btn_download_scores"
-                )
-
-            st.divider()
-
-            # -------- Botons finals --------
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("🔁 Repetir (mateix quiz)", key="btn_repeat_same"):
-                    quiz["terminado"] = False
-            with col2:
-                if st.button("🆕 Nou quiz diferent", key="btn_new_quiz_diff"):
-                    preg = generar_preguntas(st.session_state.quiz_n)
-                    if not preg:
-                        st.error("No s'han pogut generar preguntes noves.")
-                    else:
-                        st.session_state.quiz = {
-                            "preguntas": preg,
-                            "respuestas": [None] * len(preg),
-                            "terminado": False,
-                            "guardat": False
-                        }
+            # Opcional: guardar puntuació en local/session o a GitHub si tens activat
+            from datetime import datetime
+            nou_score = {
+                "nom": st.text_input("El teu nom (opcional):", ""),
+                "puntuacio": correctes,
+                "total": total,
+                "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            }
+            if st.button("💾 Desa resultat"):
+                st.session_state.scores.append(nou_score)
+                st.success("Resultat guardat en la sessió actual.")
 
 
+elif opcio == "🏆 Rànquing":
+    import pandas as pd
+    from datetime import datetime
+
+    st.header("🏆 Rànquing")
+
+    # Botones de refresco/descarga arriba (útil si acabas de guardar una puntuación)
+    col1, col2 = st.columns([1, 1], vertical_alignment="center")
+    with col1:
+        if st.button("🔄 Actualitza rànquing ara"):
+            st.cache_data.clear()
+    with col2:
+        st.caption("S’esborra la memòria cau i es torna a llegir de GitHub.")
+
+    # Leer datos (usa tu helper cacheado)
+    scores, _ = load_scores_from_github()
+
+    if not scores:
+        st.info("Encara no hi ha puntuacions al rànquing.")
+    else:
+        # Helpers para ordenar por % i per data
+        def pct(r):
+            num = r.get("puntuacio", 0)
+            den = max(1, r.get("total", 1))
+            return num / den
+
+        def parse_dt(s: str):
+            try:
+                return datetime.strptime(s, "%Y-%m-%d %H:%M")
+            except Exception:
+                return datetime.min
+
+        # Orden: % i després data (desc)
+        scores_sorted = sorted(
+            scores,
+            key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
+            reverse=True
+        )
+
+        # Construir DataFrame
+        rows = []
+        for r in scores_sorted:
+            num = r.get("puntuacio", 0)
+            den = max(1, r.get("total", 1))
+            rows.append({
+                "Nom": r.get("nom", "—"),
+                "Punts": f"{num}/{den}",
+                "%": round(100 * num / den),
+                "Data": r.get("data", "—"),
+            })
+        df = pd.DataFrame(rows)
+
+        st.dataframe(
+            df,
+            hide_index=True,
+            use_container_width=True,
+        )
+
+        # Descarga opcional (CSV)
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            "⬇️ Descarrega CSV",
+            data=csv,
+            file_name="ranking.csv",
+            mime="text/csv"
+        )
+
+# ——— Redirecció automàtica al rànquing després del quiz ———
+if st.session_state.get("__go_rank__"):
+    st.session_state["__go_rank__"] = False
+    opcio = "🏆 Rànquing"
+    st.experimental_rerun()
 
 
 
