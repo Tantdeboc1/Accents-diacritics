@@ -825,11 +825,6 @@ elif opcio == "🏆 Rànquing":
             key="btn_download_rank"
         )
 
-# ——— Redirecció automàtica al rànquing després del quiz ———
-if st.session_state.get("__go_rank__"):
-    st.session_state["__go_rank__"] = False
-    opcio = "🏆 Rànquing"
-    st.experimental_rerun()
 
 
 
