@@ -626,9 +626,13 @@ elif opcio == "📝 Mini-quiz":
     if "quiz" not in st.session_state:
         st.session_state.quiz = None
     if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10  # valor por defecte
+        st.session_state.quiz_n = 10  # valor per defecte
     if "scores" not in st.session_state:
         st.session_state.scores = []  # {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
+    if "quiz_corrected" not in st.session_state:
+        st.session_state.quiz_corrected = False
+    if "last_score" not in st.session_state:
+        st.session_state.last_score = {}
 
     quiz = st.session_state.quiz
 
@@ -643,6 +647,8 @@ elif opcio == "📝 Mini-quiz":
         )
     with col_btn:
         if st.button("Nou quiz"):
+            st.session_state.quiz_corrected = False
+            st.session_state.last_score = {}
             quiz = generar_quiz(st.session_state.quiz_n)
             st.session_state.quiz = quiz
 
@@ -661,80 +667,76 @@ elif opcio == "📝 Mini-quiz":
             )
             quiz["respuestas"][i] = seleccion if seleccion != "—" else None
             st.write("")
-# -------- Botó per corregir --------
-if st.button("Corregir", key="btn_corregir"):
-    # Calculamos nota
-    correctes = sum(
-        r == q["correcta"]
-        for r, q in zip(quiz["respuestas"], quiz["preguntas"])
-        if r
-    )
-    total = len(quiz["preguntas"])
 
-    # Guardamos estado post-correcció
-    st.session_state.quiz_corrected = True
-    st.session_state.last_score = {
-        "puntuacio": correctes,
-        "total": total,
-        "nom": st.session_state.get("last_score", {}).get("nom", ""),
-    }
-
-# -------- Panel post-correcció (estable en rerun) --------
-if st.session_state.get("quiz_corrected"):
-    score = st.session_state.get("last_score", {})
-    correctes = score.get("puntuacio", 0)
-    total = score.get("total", 0)
-
-    st.success(f"Has encertat {correctes}/{total}")
-
-    from datetime import datetime
-    st.session_state.last_score["nom"] = st.text_input(
-        "El teu nom (opcional):",
-        value=st.session_state.last_score.get("nom", ""),
-        key="inp_nom_quiz"
-    )
-    data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    colA, colB, colC = st.columns([1, 1, 1])
-
-    with colA:
-        if st.button("💾 Desa resultat", key="btn_save_score"):
-            # Guarda local en sessió
-            if "scores" not in st.session_state:
-                st.session_state.scores = []
-            record = {
-                "nom": st.session_state.last_score.get("nom", ""),
+        # -------- Botó per corregir --------
+        if st.button("Corregir", key="btn_corregir"):
+            correctes = sum(
+                r == q["correcta"]
+                for r, q in zip(quiz["respuestas"], quiz["preguntas"])
+                if r
+            )
+            total = len(quiz["preguntas"])
+            st.session_state.quiz_corrected = True
+            st.session_state.last_score = {
                 "puntuacio": correctes,
                 "total": total,
-                "data": data_str,
+                "nom": st.session_state.get("last_score", {}).get("nom", ""),
             }
-            st.session_state.scores.append(record)
-            st.success("Resultat guardat en la sessió.")
-            # GitHub opcional
-            try:
-                if "append_score_to_github" in globals():
-                    ok = append_score_to_github(record)
-                    if ok:
-                        st.success("Rànquing a GitHub actualitzat.")
-                    else:
-                        st.info("No s'ha pogut guardar a GitHub.")
-            except Exception as e:
-                st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-    with colB:
-        if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-            go_to("🏆 Rànquing")  # << redirección fiable
+        # -------- Panel post-correcció (estable en rerun) --------
+        if st.session_state.get("quiz_corrected"):
+            score = st.session_state.get("last_score", {})
+            correctes = score.get("puntuacio", 0)
+            total = score.get("total", 0)
 
-    with colC:
-        if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
-            # Limpia estado de corrección y genera otro quiz
-            st.session_state.quiz_corrected = False
-            st.session_state.last_score = {}
-            st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-            try:
-                st.rerun()
-            except Exception:
-                st.experimental_rerun()
+            st.success(f"Has encertat {correctes}/{total}")
+
+            from datetime import datetime
+            st.session_state.last_score["nom"] = st.text_input(
+                "El teu nom (opcional):",
+                value=st.session_state.last_score.get("nom", ""),
+                key="inp_nom_quiz"
+            )
+            data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            colA, colB, colC = st.columns([1, 1, 1])
+
+            with colA:
+                if st.button("💾 Desa resultat", key="btn_save_score"):
+                    # Guarda local en sessió
+                    if "scores" not in st.session_state:
+                        st.session_state.scores = []
+                    record = {
+                        "nom": st.session_state.last_score.get("nom", ""),
+                        "puntuacio": correctes,
+                        "total": total,
+                        "data": data_str,
+                    }
+                    st.session_state.scores.append(record)
+                    st.success("Resultat guardat en la sessió.")
+                    # GitHub opcional
+                    try:
+                        if "append_score_to_github" in globals():
+                            ok = append_score_to_github(record)
+                            if ok:
+                                st.success("Rànquing a GitHub actualitzat.")
+                            else:
+                                st.info("No s'ha pogut guardar a GitHub.")
+                    except Exception as e:
+                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
+
+            with colB:
+                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+                    st.session_state["__go_rank__"] = True
+                    st.experimental_rerun()
+
+            with colC:
+                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+                    st.session_state.quiz_corrected = False
+                    st.session_state.last_score = {}
+                    st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
+                    st.experimental_rerun()
+
 
 elif opcio == "🏆 Rànquing":
     import pandas as pd
@@ -804,6 +806,7 @@ if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
