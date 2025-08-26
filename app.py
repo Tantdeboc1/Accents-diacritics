@@ -549,9 +549,20 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
+
+
+# constante para evitar fallos de tíldes/espacios
+MENU_RANK = "🏆 Rànquing"
+
+# valor por defecto del menú
+if "menu" not in st.session_state:
+    st.session_state["menu"] = "🔎 Cerca un monosíl·lab"
+
 with st.sidebar:
     st.header("Menú")
-    opcio = st.radio(
+
+    # el radio ES la fuente de verdad: guarda directamente en session_state["menu"]
+    st.radio(
         "Acció",
         [
             "🔎 Cerca un monosíl·lab",
@@ -559,12 +570,17 @@ with st.sidebar:
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
-            "🏆 Rànquing"          
+            MENU_RANK,  # usa la constante
         ],
-        index=0
+        key="menu",   # ← clave única; NO pongas 'index=' manual
     )
+
     st.divider()
     st.info(f"Versió de l’app: {datetime.now():%Y-%m-%d %H:%M:%S}")
+
+# router usa SIEMPRE lo que haya en session_state["menu"]
+opcio = st.session_state["menu"]
+
 # ===========================
 # Vistas
 # ===========================
@@ -736,10 +752,9 @@ elif opcio == "📝 Mini-quiz":
                     except Exception as e:
                         st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-            with colB:
+           with colB:
                 if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    # Solo navegación, sin guardar
-                    st.session_state["menu"] = "🏆 Rànquing"
+                    st.session_state["menu"] = MENU_RANK  # ← misma constante que en el sidebar
                     rerun_safe()
 
             with colC:
@@ -815,6 +830,7 @@ if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
