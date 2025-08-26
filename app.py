@@ -31,6 +31,72 @@ with st.expander("Saps què és un monosíl·lab?"):
 # Utilidades
 # ===========================
 
+def theme_toggle():
+    """Toggle para modo oscuro/claro"""
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False
+    
+    if st.button("🌓 Canviar tema"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+    
+    if st.session_state.dark_mode:
+        st.markdown("""
+        <style>
+        .stApp > header {
+            background-color: transparent;
+        }
+        .stApp {
+            background-color: #1e1e1e;
+            color: white;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+def inject_custom_css():
+    """Inyecta CSS personalizado para mejor apariencia"""
+    st.markdown("""
+    <style>
+    .block-container { 
+        padding-bottom: 2rem !important; 
+        padding-top: 1rem !important;
+    }
+    
+    .word-card {
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        background-color: #fafafa;
+    }
+    
+    .quiz-question {
+        border-left: 4px solid #1f77b4;
+        padding-left: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .success-score {
+        background-color: #d4edda;
+        border: 1px solid #c3e6cb;
+        border-radius: 5px;
+        padding: 1rem;
+        margin: 1rem 0;
+    }
+    
+    .stSelectbox > div > div {
+        background-color: white;
+    }
+    
+    /* Mejorar contraste de palabras coloreadas */
+    [data-testid="stMarkdownContainer"] code {
+        background-color: #f1f3f4;
+        border-radius: 3px;
+        padding: 2px 4px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
 def _is_accented(word: str) -> bool:
     # True si la palabra tiene marca diacrítica (á, é, í, ó, ú, à, è, ò, ï, ü, etc.)
     nfd = unicodedata.normalize("NFD", word or "")
@@ -821,6 +887,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
