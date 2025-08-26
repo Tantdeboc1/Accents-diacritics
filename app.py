@@ -12,15 +12,29 @@ st.set_page_config(
     page_title="📘 Monosíl·labs: accents diacrítics en valencià",
     page_icon="📘",
     layout="centered",
+    initial_sidebar_state="expanded"
 )
-st.markdown("""
-<style>
-.block-container { padding-bottom: 2rem !important; }
-</style>
-""", unsafe_allow_html=True)
-st.title("📘 Monosíl·labs: accents diacrítics en valencià")
-st.caption("Consulta definicions, exemples i parelles")
 
+# Inyectar CSS personalizado AL INICIO
+inject_custom_css()
+col_title, col_theme = st.columns([4, 1])
+
+with col_title:
+    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
+    st.caption("Consulta definicions, exemples i parelles")
+
+with col_theme:
+    # Toggle tema oscuro
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False
+    
+    theme_icon = "🌙" if not st.session_state.dark_mode else "☀️"
+    theme_text = "Fosc" if not st.session_state.dark_mode else "Clar"
+    
+    if st.button(f"{theme_icon} {theme_text}", help="Canviar tema"):
+        st.session_state.dark_mode = not st.session_state.dark_mode
+        st.rerun()
+        
 with st.expander("Saps què és un monosíl·lab?"):
     st.markdown(
         "**Monosíl·lab**: paraula d’una sola síl·laba.\n\n"
@@ -31,71 +45,90 @@ with st.expander("Saps què és un monosíl·lab?"):
 # Utilidades
 # ===========================
 
-def theme_toggle():
-    """Toggle para modo oscuro/claro"""
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False
+def inject_custom_css():
+    """CSS personalizado con soporte para tema oscuro"""
+    dark_mode = st.session_state.get("dark_mode", False)
     
-    if st.button("🌓 Canviar tema"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        st.rerun()
-    
-    if st.session_state.dark_mode:
+    if dark_mode:
+        # Tema oscuro
         st.markdown("""
         <style>
-        .stApp > header {
-            background-color: transparent;
-        }
         .stApp {
             background-color: #1e1e1e;
-            color: white;
+            color: #ffffff;
+        }
+        .block-container { 
+            padding-bottom: 2rem !important; 
+            background-color: #1e1e1e;
+        }
+        .stSelectbox > div > div {
+            background-color: #2d2d2d !important;
+            color: white !important;
+        }
+        .stTextInput > div > div > input {
+            background-color: #2d2d2d !important;
+            color: white !important;
+        }
+        .quiz-progress {
+            background-color: #333333;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Tema claro (tu CSS actual + mejoras)
+        st.markdown("""
+        <style>
+        .block-container { 
+            padding-bottom: 2rem !important; 
+            padding-top: 1rem !important;
+        }
+        .quiz-progress {
+            background-color: #f0f2f6;
+            border-radius: 10px;
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 4px solid #1f77b4;
+        }
+        .quiz-question {
+            border-left: 4px solid #1f77b4;
+            padding-left: 1rem;
+            margin: 1rem 0;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 1rem;
+        }
+        .success-score {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 1rem;
+            margin: 1rem 0;
         }
         </style>
         """, unsafe_allow_html=True)
 
-def inject_custom_css():
-    """Inyecta CSS personalizado para mejor apariencia"""
+def show_quiz_progress(current: int, total: int, answered: int):
+    """Muestra barra de progreso del quiz"""
+    progress = answered / total
+    
     st.markdown("""
-    <style>
-    .block-container { 
-        padding-bottom: 2rem !important; 
-        padding-top: 1rem !important;
-    }
-    
-    .word-card {
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        background-color: #fafafa;
-    }
-    
-    .quiz-question {
-        border-left: 4px solid #1f77b4;
-        padding-left: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .success-score {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 5px;
-        padding: 1rem;
-        margin: 1rem 0;
-    }
-    
-    .stSelectbox > div > div {
-        background-color: white;
-    }
-    
-    /* Mejorar contraste de palabras coloreadas */
-    [data-testid="stMarkdownContainer"] code {
-        background-color: #f1f3f4;
-        border-radius: 3px;
-        padding: 2px 4px;
-    }
-    </style>
+    <div class="quiz-progress">
     """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
+    with col1:
+        st.progress(progress)
+    with col2:
+        st.metric("Pregunta", f"{current}/{total}")
+    with col3:
+        st.metric("Respostes", f"{answered}/{total}")
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+
     
 def _is_accented(word: str) -> bool:
     # True si la palabra tiene marca diacrítica (á, é, í, ó, ú, à, è, ò, ï, ü, etc.)
@@ -620,30 +653,45 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
-if st.session_state.get("__nav_target__"):
-    st.session_state["menu"] = st.session_state.pop("__nav_target__")
-
-MENU_RANK = "🏆 Rànquing"
-
-if "menu" not in st.session_state:
-    st.session_state["menu"] = "🔎 Cerca un monosíl·lab"
-
 with st.sidebar:
-    st.header("Menú")
-    st.radio(
+    st.header("📋 Menú")
+    
+    # Indicador de tema actual
+    theme_status = "🌙 Tema fosc" if st.session_state.get("dark_mode", False) else "☀️ Tema clar"
+    st.caption(theme_status)
+    
+    opcio = st.radio(
         "Acció",
         [
-            "🔎 Cerca un monosíl·lab",
+            "🔍 Cerca un monosíl·lab",
             "📃 Llista",
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
-            MENU_RANK,
+            "🏆 Rànquing",
+            "⭐ Favorites"  # Nueva opción
         ],
-        key="menu",
+        index=0
     )
-# router usa SIEMPRE lo que haya en session_state["menu"]
-opcio = st.session_state["menu"]
+    
+    st.divider()
+    
+    # Estadísticas rápidas
+    st.caption("📊 **Estadístiques ràpides**")
+    total_words = len(monosilabos)
+    total_pairs = len(pares)
+    st.caption(f"• {total_words} monosíl·labs")
+    st.caption(f"• {total_pairs} parelles")
+    
+    if st.session_state.get("historial"):
+        st.caption(f"• {len(st.session_state.historial)} cerques")
+    
+    if st.session_state.get("scores"):
+        avg_score = sum(s["puntuacio"]/s["total"] for s in st.session_state.scores[-5:]) / min(5, len(st.session_state.scores))
+        st.caption(f"• Mitjana: {avg_score:.1%}")
+    
+    st.divider()
+    st.info(f"Versió: {datetime.now():%Y-%m-%d %H:%M:%S}")
 
 # ===========================
 # Vistas
@@ -709,15 +757,15 @@ elif opcio == "🕘 Historial":
         st.write("Encara no hi ha cerques.")
         
 elif opcio == "📝 Mini-quiz":
-    st.header("Mini-quiz: tria la forma correcta")
+    st.header("📝 Mini-quiz: tria la forma correcta")
 
-    # -------- Estado inicial necesario --------
+    # Estados necesarios
     if "quiz" not in st.session_state:
         st.session_state.quiz = None
     if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10  # valor per defecte
+        st.session_state.quiz_n = 10
     if "scores" not in st.session_state:
-        st.session_state.scores = []  # {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
+        st.session_state.scores = []
     if "quiz_corrected" not in st.session_state:
         st.session_state.quiz_corrected = False
     if "last_score" not in st.session_state:
@@ -725,7 +773,7 @@ elif opcio == "📝 Mini-quiz":
 
     quiz = st.session_state.quiz
 
-    # -------- Selector nº de preguntes + botón nuevo quiz --------
+    # Selector y botón
     col_sel, col_btn = st.columns([1, 1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
@@ -735,95 +783,143 @@ elif opcio == "📝 Mini-quiz":
             help="Tria quantes preguntes vols que tinga el quiz."
         )
     with col_btn:
-        if st.button("Nou quiz"):
+        if st.button("🎮 Nou quiz"):
             st.session_state.quiz_corrected = False
             st.session_state.last_score = {}
             quiz = generar_quiz(st.session_state.quiz_n)
             st.session_state.quiz = quiz
+            st.rerun()
 
-    # -------- Si no hi ha quiz, indicació --------
     if not quiz:
-        st.info("Prem **Nou quiz** per a començar.")
+        st.info("Prem **🎮 Nou quiz** per a començar.")
     else:
-        # -------- Render de preguntes (2 opcions en desplegable) --------
+        # BARRA DE PROGRESO
+        answered_count = sum(1 for r in quiz["respuestas"] if r is not None)
+        show_quiz_progress(1, len(quiz["preguntas"]), answered_count)
+        
+        # Renderizar preguntas con mejor diseño
         for i, q in enumerate(quiz["preguntas"]):
-            st.markdown(f"**{i+1}.** {q['enunciado']}")
+            st.markdown(f"""
+            <div class="quiz-question">
+                <h4>Pregunta {i+1}</h4>
+                <p style="font-size: 1.1em; margin-bottom: 1rem;">{q['enunciado']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # Selectbox con mejor UX
+            current_answer = quiz["respuestas"][i]
             seleccion = st.selectbox(
-                f"Tria la forma correcta ({i+1})",
-                options=["—"] + q["opciones"],
-                index=(["—"] + q["opciones"]).index(quiz["respuestas"][i]) if quiz["respuestas"][i] in q["opciones"] else 0,
-                key=f"sel_{i}"
+                "Tria la forma correcta:",
+                options=["— Selecciona una opció —"] + q["opciones"],
+                index=(["— Selecciona una opció —"] + q["opciones"]).index(current_answer) if current_answer in q["opciones"] else 0,
+                key=f"sel_{i}",
+                help=f"Pregunta {i+1} de {len(quiz['preguntas'])}"
             )
-            quiz["respuestas"][i] = seleccion if seleccion != "—" else None
-            st.write("")
+            
+            if seleccion != "— Selecciona una opció —":
+                quiz["respuestas"][i] = seleccion
+            else:
+                quiz["respuestas"][i] = None
+            
+            st.markdown("---")
 
-        # -------- Botó per corregir --------
-        if st.button("Corregir", key="btn_corregir"):
-            correctes = sum(
-                r == q["correcta"]
-                for r, q in zip(quiz["respuestas"], quiz["preguntas"])
-                if r
-            )
-            total = len(quiz["preguntas"])
-            st.session_state.quiz_corrected = True
-            st.session_state.last_score = {
-                "puntuacio": correctes,
-                "total": total,
-                "nom": st.session_state.get("last_score", {}).get("nom", ""),
-            }
+        # Actualizar progreso tras cambios
+        answered_count = sum(1 for r in quiz["respuestas"] if r is not None)
+        
+        # Botón corregir con validación
+        can_correct = answered_count == len(quiz["preguntas"])
+        
+        if can_correct:
+            if st.button("✅ Corregir", key="btn_corregir", type="primary"):
+                correctes = sum(
+                    r == q["correcta"]
+                    for r, q in zip(quiz["respuestas"], quiz["preguntas"])
+                    if r
+                )
+                total = len(quiz["preguntas"])
+                st.session_state.quiz_corrected = True
+                st.session_state.last_score = {
+                    "puntuacio": correctes,
+                    "total": total,
+                    "nom": st.session_state.get("last_score", {}).get("nom", ""),
+                }
+                st.rerun()
+        else:
+            st.warning(f"⚠️ Respon totes les preguntes per corregir. ({answered_count}/{len(quiz['preguntas'])} respostes)")
 
-                  # -------- Panel post-correcció (estable en rerun) --------
+        # Panel post-corrección
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
             correctes = score.get("puntuacio", 0)
             total = score.get("total", 0)
+            percentage = (correctes / total) * 100 if total > 0 else 0
 
-            st.success(f"Has encertat {correctes}/{total}")
+            # Resultado con mejor diseño
+            st.markdown(f"""
+            <div class="success-score">
+                <h3>🎯 Resultat del Quiz</h3>
+                <h2 style="color: {'#28a745' if percentage >= 70 else '#ffc107' if percentage >= 50 else '#dc3545'};">
+                    {correctes}/{total} ({percentage:.1f}%)
+                </h2>
+            </div>
+            """, unsafe_allow_html=True)
 
-            from datetime import datetime
+            # Mostrar respuestas incorrectas
+            wrong_answers = []
+            for i, (respuesta, pregunta) in enumerate(zip(quiz["respuestas"], quiz["preguntas"])):
+                if respuesta != pregunta["correcta"]:
+                    wrong_answers.append((i+1, pregunta["correcta"], respuesta, pregunta["enunciado"]))
+            
+            if wrong_answers:
+                with st.expander(f"❌ Veure errors ({len(wrong_answers)})"):
+                    for num, correcta, incorrecta, enunciado in wrong_answers:
+                        st.write(f"**{num}.** {enunciado}")
+                        st.write(f"• ✅ Correcta: **{correcta}**")
+                        st.write(f"• ❌ La teua: **{incorrecta}**")
+                        st.write("---")
+
+            # Input nombre y botones
             st.session_state.last_score["nom"] = st.text_input(
                 "El teu nom (opcional):",
                 value=st.session_state.last_score.get("nom", ""),
                 key="inp_nom_quiz"
             )
-            data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-            # 👇 columnas y botones, todo dentro del mismo if y alineado igual
             colA, colB, colC = st.columns([1, 1, 1])
 
             with colA:
                 if st.button("💾 Guardar rànquing", key="btn_save_rank"):
+                    from datetime import datetime
                     record = {
-                        "nom": st.session_state.last_score.get("nom", ""),
+                        "nom": st.session_state.last_score.get("nom", "Anònim"),
                         "puntuacio": correctes,
                         "total": total,
-                        "data": data_str,
+                        "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     }
+                    
                     if "scores" not in st.session_state:
                         st.session_state.scores = []
                     st.session_state.scores.append(record)
-                    st.success("Resultat guardat en la sessió.")
+                    st.success("✅ Resultat guardat!")
+                    
+                    # Guardar en GitHub si está configurado
                     try:
-                        if "append_score_to_github" in globals():
-                            ok = append_score_to_github(record)
-                            if ok:
-                                st.success("Rànquing a GitHub actualitzat.")
-                            else:
-                                st.info("No s'ha pogut guardar a GitHub.")
+                        if append_score_to_github(record):
+                            st.success("☁️ Rànquing actualitzat a GitHub!")
                     except Exception as e:
-                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
+                        st.info(f"GitHub no disponible: {str(e)[:50]}...")
 
             with colB:
                 if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["__nav_target__"] = MENU_RANK
-                    rerun_safe()
+                    st.session_state["temp_redirect"] = "🏆 Rànquing"
+                    st.rerun()
 
             with colC:
-                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+                if st.button("🔄 Nou quiz", key="btn_new_quiz_after"):
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-                    rerun_safe()
+                    st.rerun()
 
 
 elif opcio == "🏆 Rànquing":
@@ -884,6 +980,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
