@@ -839,82 +839,57 @@ elif opcio == "📝 Mini-quiz":
         else:
             st.warning(f"⚠️ Respon totes les preguntes per corregir. ({answered_count}/{len(quiz['preguntas'])} respostes)")
 
-        # Panel post-corrección
+                # -------- Panel post-correcció (estable en rerun) --------
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
             correctes = score.get("puntuacio", 0)
             total = score.get("total", 0)
-            percentage = (correctes / total) * 100 if total > 0 else 0
 
-            # Resultado con mejor diseño
-            st.markdown(f"""
-            <div class="success-score">
-                <h3>🎯 Resultat del Quiz</h3>
-                <h2 style="color: {'#28a745' if percentage >= 70 else '#ffc107' if percentage >= 50 else '#dc3545'};">
-                    {correctes}/{total} ({percentage:.1f}%)
-                </h2>
-            </div>
-            """, unsafe_allow_html=True)
+            st.success(f"Has encertat {correctes}/{total}")
 
-            # Mostrar respuestas incorrectas
-            wrong_answers = []
-            for i, (respuesta, pregunta) in enumerate(zip(quiz["respuestas"], quiz["preguntas"])):
-                if respuesta != pregunta["correcta"]:
-                    wrong_answers.append((i+1, pregunta["correcta"], respuesta, pregunta["enunciado"]))
-            
-            if wrong_answers:
-                with st.expander(f"❌ Veure errors ({len(wrong_answers)})"):
-                    for num, correcta, incorrecta, enunciado in wrong_answers:
-                        st.write(f"**{num}.** {enunciado}")
-                        st.write(f"• ✅ Correcta: **{correcta}**")
-                        st.write(f"• ❌ La teua: **{incorrecta}**")
-                        st.write("---")
-
-            # Input nombre y botones
+            from datetime import datetime
             st.session_state.last_score["nom"] = st.text_input(
                 "El teu nom (opcional):",
                 value=st.session_state.last_score.get("nom", ""),
                 key="inp_nom_quiz"
             )
+            data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
             colA, colB, colC = st.columns([1, 1, 1])
 
             with colA:
                 if st.button("💾 Guardar rànquing", key="btn_save_rank"):
-                    from datetime import datetime
                     record = {
-                        "nom": st.session_state.last_score.get("nom", "Anònim"),
+                        "nom": st.session_state.last_score.get("nom", ""),
                         "puntuacio": correctes,
                         "total": total,
-                        "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "data": data_str,
                     }
-                    
                     if "scores" not in st.session_state:
                         st.session_state.scores = []
                     st.session_state.scores.append(record)
-                    st.success("✅ Resultat guardat!")
-                    
-                    # Guardar en GitHub si está configurado
+                    st.success("Resultat guardat en la sessió.")
                     try:
-                        if append_score_to_github(record):
-                            st.success("☁️ Rànquing actualitzat a GitHub!")
+                        if "append_score_to_github" in globals():
+                            ok = append_score_to_github(record)
+                            if ok:
+                                st.success("Rànquing a GitHub actualitzat.")
+                            else:
+                                st.info("No s'ha pogut guardar a GitHub.")
                     except Exception as e:
-                        st.info(f"GitHub no disponible: {str(e)[:50]}...")
+                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-         with colB:
+            with colB:
                 if st.button("🏆 Veure rànquing", key="btn_go_rank"):
                     st.session_state["__nav_target__"] = MENU_RANK
-                    try:
-                        st.rerun()
-                    except Exception:
-                        st.experimental_rerun()
+                    rerun_safe()
 
             with colC:
-                if st.button("🔄 Nou quiz", key="btn_new_quiz_after"):
+                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-                    st.rerun()
+                    rerun_safe()
 
 
 elif opcio == "🏆 Rànquing":
@@ -975,6 +950,7 @@ elif opcio == "🏆 Rànquing":
             mime="text/csv",
             key="btn_download_rank"
         )
+
 
 
 
