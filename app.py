@@ -84,6 +84,15 @@ def display_word_info(paraula: str):
             st.code(bloc2)
             st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l", key=f"copy_{altra}")
 
+def rerun_safe():
+    """Forza un rerun compatible con versiones nuevas/antiguas de Streamlit."""
+    try:
+        st.rerun()              # versiones nuevas
+    except Exception:
+        try:
+            st.experimental_rerun()  # versiones antiguas
+        except Exception:
+            pass
 
 def make_cloze(sentence: str, word: str) -> str:
     """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
@@ -699,58 +708,55 @@ elif opcio == "📝 Mini-quiz":
             )
             data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-            colA, colB, colC = st.columns([1, 1, 1])
+colA, colB, colC = st.columns([1, 1, 1])
 
-            with colA:
-                if st.button("💾 Desa resultat", key="btn_save_score"):
-                    # Guarda local en sessió
-                    if "scores" not in st.session_state:
-                        st.session_state.scores = []
-                    record = {
-                        "nom": st.session_state.last_score.get("nom", ""),
-                        "puntuacio": correctes,
-                        "total": total,
-                        "data": data_str,
-                    }
-                    st.session_state.scores.append(record)
-                    st.success("Resultat guardat en la sessió.")
-                    # GitHub opcional
-                    try:
-                        if "append_score_to_github" in globals():
-                            ok = append_score_to_github(record)
-                            if ok:
-                                st.success("Rànquing a GitHub actualitzat.")
-                            else:
-                                st.info("No s'ha pogut guardar a GitHub.")
-                    except Exception as e:
-                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
+with colA:
+    if st.button("💾 Guardar rànquing", key="btn_save_rank"):
+        # Construimos el registro con el nombre actual
+        record = {
+            "nom": st.session_state.last_score.get("nom", ""),
+            "puntuacio": correctes,
+            "total": total,
+            "data": data_str,
+        }
+        # Guarda en sesión
+        if "scores" not in st.session_state:
+            st.session_state.scores = []
+        st.session_state.scores.append(record)
+        st.success("Resultat guardat en la sessió.")
+        # Guarda en GitHub (si tienes secrets configurados)
+        try:
+            if "append_score_to_github" in globals():
+                ok = append_score_to_github(record)  # este helper ya limpia la caché
+                if ok:
+                    st.success("Rànquing a GitHub actualitzat.")
+                else:
+                    st.info("No s'ha pogut guardar a GitHub.")
+        except Exception as e:
+            st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
-            with colB:
-                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["__go_rank__"] = True
-                    st.experimental_rerun()
+with colB:
+    if st.button("🏆 Veure rànquing", key="btn_go_rank"):
+        # Solo navegación, sin guardar
+        st.session_state["menu"] = "🏆 Rànquing"
+        rerun_safe()
 
-            with colC:
-                if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
-                    st.session_state.quiz_corrected = False
-                    st.session_state.last_score = {}
-                    st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-                    st.experimental_rerun()
+with colC:
+    if st.button("🔁 Nou quiz", key="btn_new_quiz_after"):
+        # Reset estado post-corrección y genera otro quiz
+        st.session_state.quiz_corrected = False
+        st.session_state.last_score = {}
+        st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
+        rerun_safe()
 
 
 elif opcio == "🏆 Rànquing":
-    import pandas as pd
-    from datetime import datetime
-
     st.header("🏆 Rànquing")
 
     # Botón de refresco (limpia caché y relee)
-    if st.button("🔄 Actualitza rànquing ara"):
-        st.cache_data.clear()
-        try:
-            st.rerun()
-        except Exception:
-            st.experimental_rerun()
+ if st.button("🔄 Actualitza rànquing ara"):
+    st.cache_data.clear()
+    rerun_safe()
 
     # Leer datos
     scores, _ = load_scores_from_github()
@@ -806,6 +812,7 @@ if st.session_state.get("__go_rank__"):
     st.session_state["__go_rank__"] = False
     opcio = "🏆 Rànquing"
     st.experimental_rerun()
+
 
 
 
