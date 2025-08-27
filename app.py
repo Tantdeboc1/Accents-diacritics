@@ -29,6 +29,9 @@ def init_session_state():
         st.session_state.quiz_corrected = False
     if "last_score" not in st.session_state:
         st.session_state.last_score = {}
+    # Inicializar menú por defecto si no existe
+    if "menu" not in st.session_state:
+        st.session_state["menu"] = "🔍 Cerca un monosíl·lab"
 
 def inject_custom_css():
     """CSS personalizado con soporte para tema oscuro y claro (contraste garantizado)."""
@@ -47,6 +50,8 @@ def inject_custom_css():
             --accent: #4a9eff;
             --btn: #2d2d2d;
             --btn-hover: #404040;
+            --code-bg: #1a1a1a;
+            --code-fg: #e0e0e0;
         }
         /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
@@ -105,9 +110,55 @@ def inject_custom_css():
             border-radius: 5px; padding: 1rem; margin: 1rem 0;
             color: var(--fg) !important;
         }
-        /* DataFrame */
-        .stDataFrame, .stDataFrame * {
+        /* DataFrame - ARREGLADO COMPLETO */
+        .stDataFrame, .stDataFrame div, .stDataFrame table, 
+        .stDataFrame th, .stDataFrame td, 
+        [data-testid="dataframe"], [data-testid="dataframe"] *,
+        [data-testid="dataframe"] table, [data-testid="dataframe"] tbody,
+        [data-testid="dataframe"] th, [data-testid="dataframe"] td,
+        [data-testid="stDataFrame"], [data-testid="stDataFrame"] *,
+        div[data-testid="dataframe"] table tbody tr td,
+        div[data-testid="dataframe"] table thead tr th {
+            background-color: var(--bg-2) !important;
             color: var(--fg) !important;
+            border-color: #e9ecef !important;
+        }
+        
+        /* Sidebar toggle button - MODO OSCURO */
+        [data-testid="collapsedControl"] {
+            color: #ffffff !important;
+            background-color: var(--bg-2) !important;
+        }
+        
+        [data-testid="collapsedControl"] svg {
+            fill: #ffffff !important;
+        }
+        
+        /* Tooltip/help text */
+        .stTooltipIcon, [data-testid="stTooltipHoverTarget"],
+        [role="tooltip"], div[data-baseweb="tooltip"] {
+            background-color: var(--bg-3) !important;
+            color: var(--fg) !important;
+            border: 1px solid #e9ecef !important;
+        }
+        
+        /* Code blocks - ARREGLADO para que se vean en modo oscuro */
+        .stCode, .stCodeBlock, 
+        .stCode > div, .stCodeBlock > div, 
+        .stCode pre, .stCodeBlock pre, 
+        .stCode code, .stCodeBlock code,
+        [data-testid="stCodeBlock"],
+        [data-testid="stCodeBlock"] *,
+        pre, code {
+            background-color: var(--code-bg) !important;
+            color: var(--code-fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        
+        /* Monosílabs acentuats en blau per a 'Definició' */
+        .accented {
+            color: #1e90ff !important;
+            font-weight: 600;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -125,6 +176,8 @@ def inject_custom_css():
             --accent: #0066cc;
             --btn: #f8f9fa;
             --btn-hover: #e9ecef;
+            --code-bg: #f8f9fa;
+            --code-fg: #333333;
         }
         /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
@@ -186,9 +239,34 @@ def inject_custom_css():
             border-radius: 5px; padding: 1rem; margin: 1rem 0;
             color: #0f5132 !important;
         }
-        /* DataFrame */
-        .stDataFrame, .stDataFrame * {
+        /* DataFrame - ARREGLADO */
+        .stDataFrame, .stDataFrame div, .stDataFrame table, 
+        .stDataFrame th, .stDataFrame td,
+        [data-testid="dataframe"] *, 
+        [data-testid="dataframe"] table,
+        [data-testid="dataframe"] th,
+        [data-testid="dataframe"] td {
+            background-color: var(--bg-2) !important;
             color: var(--fg) !important;
+        }
+        
+        /* Code blocks - ARREGLADO para que se vean en modo claro */
+        .stCode, .stCodeBlock, 
+        .stCode > div, .stCodeBlock > div, 
+        .stCode pre, .stCodeBlock pre, 
+        .stCode code, .stCodeBlock code,
+        [data-testid="stCodeBlock"],
+        [data-testid="stCodeBlock"] *,
+        pre, code {
+            background-color: var(--code-bg) !important;
+            color: var(--code-fg) !important;
+            border: 1px solid #e9ecef !important;
+        }
+        
+        /* Monosílabs acentuats en blau per a 'Definició' */
+        .accented {
+            color: #1e90ff !important;
+            font-weight: 600;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -211,8 +289,13 @@ def _is_accented(word: str) -> bool:
     return any(unicodedata.category(ch) == "Mn" for ch in nfd)
 
 def color_word(word: str) -> str:
-    # Devuelve Markdown con color: azul si acentuada, gris si no
-    return f":blue[{word}]" if _is_accented(word) else f":gray[{word}]"
+    # Devuelve la palabra sin color
+    return word
+
+
+def highlight_accented(text: str) -> str:
+    """Ya no resalta los monosílabs acentuados"""
+    return text
 
 def search_suggestions(prefix: str):
      """Sugerencias por inicial (sin quitar acentos)."""
@@ -227,16 +310,29 @@ def display_word_info(paraula: str):
     st.write("**Categoria:**", info.get("categoria", "—"))
     st.write("**Definició:**", info["definicion"])
 
-    # Exemples (2 aleatoris)
+    # Generar key único para ejemplos basado en session_state
+    if f"examples_{paraula}" not in st.session_state:
+        st.session_state[f"examples_{paraula}"] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
+    
+    ej = st.session_state[f"examples_{paraula}"]
+    
+    # Exemples
     st.write("**Exemples:**")
-    ej = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
     for ex in ej:
-        st.write(f"- {ex}")
+        st.markdown("- " + ex)
 
     # Bloc per copiar: definició + exemples mostrats
     bloc = f"{paraula.capitalize()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
     st.code(bloc)
-    st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l")
+    
+    # Botones en columnas
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("Copia", help="Selecciona el bloc i copia'l", key=f"copy_btn_{paraula}")
+    with col2:
+        if st.button("Generar nous exemples", key=f"new_examples_{paraula}"):
+            st.session_state[f"examples_{paraula}"] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
+            st.rerun()
 
     # — Contrast (si existeix) —
     if paraula in parelles:
@@ -247,16 +343,29 @@ def display_word_info(paraula: str):
             st.write("**Categoria:**", info2.get("categoria", "—"))
             st.write("**Definició:**", info2["definicion"])
 
-            # Exemples (2 aleatoris) de la parella
+            # Generar key único para ejemplos de la pareja
+            if f"examples_{altra}" not in st.session_state:
+                st.session_state[f"examples_{altra}"] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
+            
+            ej2 = st.session_state[f"examples_{altra}"]
+
+            # Exemples de la parella
             st.write("**Exemples:**")
-            ej2 = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
             for ex in ej2:
-                st.write(f"- {ex}")
+                st.markdown("- " + ex)
 
             # Bloc per copiar de la paraula contrast
             bloc2 = f"{altra.capitalize()}\n{info2['definicion']}\n" + "\n".join(f"- {e}" for e in ej2)
             st.code(bloc2)
-            st.button("📋 Copiar (selecciona i copia)", help="Selecciona el bloc i copia'l", key=f"copy_{altra}")
+            
+            # Botones en columnas para la pareja
+            col3, col4 = st.columns(2)
+            with col3:
+                st.button("Copia", help="Selecciona el bloc i copia'l", key=f"copy_btn_{altra}")
+            with col4:
+                if st.button("Generar nous exemples", key=f"new_examples_{altra}"):
+                    st.session_state[f"examples_{altra}"] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
+                    st.rerun()
 
 def rerun_safe():
     """Forza un rerun compatible amb versiones nuevas/antiguas de Streamlit."""
@@ -390,7 +499,7 @@ def append_score_to_github(record: dict, max_retries=3):
     return False
 
 # ===========================
-# Dades (els 15 monosíl·labs)
+# Dades (els 15 monosílabs)
 # ===========================
 monosilabos = {
     "sí": {"categoria": "adverbi d'afirmació",
@@ -763,15 +872,8 @@ if "scores" not in st.session_state:
 # ===========================
 # Barra lateral (menú)
 # ===========================
-# Hook de navegación: aplica redirección pendiente ANTES de dibujar el sidebar
-if st.session_state.get("__nav_target__"):
-    st.session_state["menu"] = st.session_state.pop("__nav_target__")
 
-MENU_RANK = "🏆 Rànquing"
-
-# Valor por defecto del menú si no existe aún
-if "menu" not in st.session_state:
-    st.session_state["menu"] = "🔍 Cerca un monosíl·lab"
+MENU_RANK = "🏆 Ránquing Quiz"
 
 with st.sidebar:
     st.header("📋 Menú")
@@ -780,10 +882,10 @@ with st.sidebar:
     theme_icon = "☀️" if st.session_state.dark_mode else "🌙"
     theme_text = "Canviar a tema clar" if st.session_state.dark_mode else "Canviar a tema fosc"
     
+    # ARREGLO: No usar rerun_safe() aquí, solo cambiar el estado
     if st.button(f"{theme_icon} {theme_text}", key="theme_toggle"):
         st.session_state.dark_mode = not st.session_state.dark_mode
-        inject_custom_css()
-        st.rerun()
+        # NO hacer rerun aquí para mantener la página actual
 
     # El radio lee/escribe directamente en session_state["menu"]
     st.radio(
@@ -800,24 +902,6 @@ with st.sidebar:
     )
 
     st.divider()
-
-    # Estadísticas rápidas
-    st.caption("📊 **Estadístiques ràpides**")
-    total_words = len(monosilabos)
-    total_pairs = len(parelles) if 'parelles' in globals() else 0
-    st.caption(f"• {total_words} monosíl·labs")
-    st.caption(f"• {total_pairs} parelles")
-
-    if st.session_state.get("historial"):
-        st.caption(f"• {len(st.session_state.historial)} cerques")
-
-    if st.session_state.get("scores"):
-        last = st.session_state.scores[-5:]
-        if last:
-            avg_score = sum(s["puntuacio"] / max(1, s["total"]) for s in last) / len(last)
-            st.caption(f"• Mitjana: {avg_score:.1%}")
-
-    st.divider()
     st.info(f"Versió: {datetime.now():%Y-%m-%d %H:%M:%S}")
 
 # Router: SIEMPRE después de construir el sidebar
@@ -828,31 +912,43 @@ opcio = st.session_state["menu"]
 # ===========================
 if opcio == "🔍 Cerca un monosíl·lab":
     st.header("🔍 Cerca un monosíl·lab")
-    paraula_input = st.text_input(
-        "Escriu el monosíl·lab (amb o sense accent):",
-        placeholder="Ex: més, que, sí..."
-    )
+    
+    col_input, col_btn = st.columns([3, 1])
+    
+    with col_input:
+        paraula_input = st.text_input(
+            "Escriu el monosíl·lab (amb o sense accent):",
+            placeholder="Ex: més, que, sí...",
+            key="search_input"
+        )
+    
+    with col_btn:
+        st.write("")  # Espaciado para alinear
+        search_clicked = st.button("🔍 Cerca", key="search_btn")
 
-    if paraula_input:
-        p = paraula_input.strip().lower()
-        key = p if p in monosilabos else None
+    # Procesar búsqueda si se presionó Enter o el botón
+    if paraula_input or search_clicked:
+        search_term = st.session_state.get("search_input", "").strip()
+        if search_term:
+            p = search_term.lower()
+            key = p if p in monosilabos else None
 
-        if key:
-            # Añadir al historial (evita duplicados consecutivos)
-            if not st.session_state.historial or st.session_state.historial[-1] != key:
-                st.session_state.historial.append(key)
+            if key:
+                # Añadir al historial (evita duplicados consecutivos)
+                if not st.session_state.historial or st.session_state.historial[-1] != key:
+                    st.session_state.historial.append(key)
 
-            # Mostrar información
-            display_word_info(key)
+                # Mostrar información
+                display_word_info(key)
 
-        else:
-            st.warning("No està en la base de dades. Revisa l'accent.")
-            # Mostrar pistes amb colors
-            sugerides = search_suggestions(paraula_input)
-            if sugerides:
-                st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
             else:
-                st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
+                st.warning("No està en la base de dades. Revisa l'accent.")
+                # Mostrar pistas con colores
+                sugerides = search_suggestions(search_term)
+                if sugerides:
+                    st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
+                else:
+                    st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
 
 elif opcio == "🃏 Llista":
     st.header("Monosíl·labs disponibles (en parelles)")
@@ -870,7 +966,7 @@ elif opcio == "📚 Llista detallada":
                 st.write("**Definició:**", info["definicion"])
                 st.write("**Exemples:**")
                 for ex in info["ejemplos"]:
-                    st.write(f"- {ex}")
+                    st.markdown("- " + ex)
 
 elif opcio == "🕘 Historial":
     st.header("Historial de cerques")
@@ -901,7 +997,7 @@ elif opcio == "📝 Mini-quiz":
 
     quiz = st.session_state.quiz
 
-    # Selector y botón
+    # Selector y botón en la misma línea
     col_sel, col_btn = st.columns([1, 1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
@@ -911,6 +1007,7 @@ elif opcio == "📝 Mini-quiz":
             help="Tria quantes preguntes vols que tinga el quiz."
         )
     with col_btn:
+        st.write("")  # Espaciado para alinear con el selectbox
         if st.button("🎮 Nou quiz"):
             st.session_state.quiz_corrected = False
             st.session_state.last_score = {}
@@ -994,7 +1091,7 @@ elif opcio == "📝 Mini-quiz":
             colA, colB, colC = st.columns([1, 1, 1])
 
             with colA:
-                if st.button("💾 Guardar rànquing", key="btn_save_rank"):
+                if st.button("💾 Guardar ránquing", key="btn_save_rank"):
                     record = {
                         "nom": st.session_state.last_score.get("nom", ""),
                         "puntuacio": correctes,
@@ -1009,34 +1106,34 @@ elif opcio == "📝 Mini-quiz":
                         if "append_score_to_github" in globals():
                             ok = append_score_to_github(record)
                             if ok:
-                                st.success("Rànquing a GitHub actualitzat.")
+                                st.success("Ránquing a GitHub actualitzat.")
                             else:
                                 st.info("No s'ha pogut guardar a GitHub.")
                     except Exception as e:
                         st.info(f"No s'ha pogut guardar a GitHub: {e}")
 
             with colB:
-                if st.button("🏆 Veure rànquing", key="btn_go_rank"):
-                    st.session_state["__nav_target__"] = MENU_RANK
-                    rerun_safe()
+                if st.button("🏆 Veure ránquing", key="btn_go_rank"):
+                    st.session_state["menu"] = MENU_RANK
+                    st.rerun()
 
             with colC:
                 if st.button("📝 Nou quiz", key="btn_new_quiz_after"):
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-                    rerun_safe()
+                    st.rerun()
 
-elif opcio == "🏆 Rànquing":
+elif opcio == "🏆 Ránquing Quiz":
     import pandas as pd
     from datetime import datetime
 
-    st.header("🏆 Rànquing")
+    st.header("🏆 Ránquing Quiz")
 
     # Botón de refresco (limpia caché y relee)
-    if st.button("🔄 Actualitza rànquing ara"):
+    if st.button("🔄 Actualitza ránquing ara"):
         st.cache_data.clear()
-        rerun_safe()
+        st.rerun()
 
     # Leer datos
     try:
@@ -1045,43 +1142,64 @@ elif opcio == "🏆 Rànquing":
         scores = []
 
     if not scores:
-        st.info("Encara no hi ha puntuacions al rànquing.")
+        st.info("Encara no hi ha puntuacions al ránquing.")
     else:
-        # Orden: % y fecha desc
-        def pct(r):
-            den = max(1, r.get("total", 1))
-            return (r.get("puntuacio", 0) / den)
+        # Separar por número de preguntas
+        scores_5 = [s for s in scores if s.get("total") == 5]
+        scores_10 = [s for s in scores if s.get("total") == 10]
+        scores_20 = [s for s in scores if s.get("total") == 20]
 
-        def parse_dt(s: str):
-            try:
-                return datetime.strptime(s, "%Y-%m-%d %H:%M")
-            except Exception:
-                return datetime.min
+        # Función para ordenar y crear DataFrame
+        def create_ranking_df(scores_list):
+            def pct(r):
+                den = max(1, r.get("total", 1))
+                return (r.get("puntuacio", 0) / den)
 
-        scores_sorted = sorted(
-            scores,
-            key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
-            reverse=True
-        )
+            def parse_dt(s: str):
+                try:
+                    return datetime.strptime(s, "%Y-%m-%d %H:%M")
+                except Exception:
+                    return datetime.min
 
-        rows = []
-        for r in scores_sorted:
-            num = r.get("puntuacio", 0)
-            den = max(1, r.get("total", 1))
-            rows.append({
-                "Nom": r.get("nom", "—"),
-                "Punts": f"{num}/{den}",
-                "%": round(100 * num / den),
-                "Data": r.get("data", "—"),
-            })
-        df = pd.DataFrame(rows)
-        st.dataframe(df, hide_index=True, use_container_width=True)
-        # Descarga CSV (asegúrate de crear df ANTES de este botón)
-        csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            "⬇️ Descarrega CSV",
-            data=csv,
-            file_name="ranking.csv",
-            mime="text/csv",
-            key="btn_download_rank"
-        )
+            scores_sorted = sorted(
+                scores_list,
+                key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
+                reverse=True
+            )
+
+            rows = []
+            for r in scores_sorted:
+                num = r.get("puntuacio", 0)
+                den = max(1, r.get("total", 1))
+                rows.append({
+                    "Nom": r.get("nom", "—"),
+                    "Punts": f"{num}/{den}",
+                    "%": round(100 * num / den),
+                    "Data": r.get("data", "—"),
+                })
+
+            return pd.DataFrame(rows)
+
+        # Crear tabs para cada ranking
+        tab1, tab2, tab3 = st.tabs(["5 preguntes", "10 preguntes", "20 preguntes"])
+        
+        with tab1:
+            if scores_5:
+                df_5 = create_ranking_df(scores_5)
+                st.dataframe(df_5, hide_index=True, use_container_width=True)
+            else:
+                st.info("Encara no hi ha puntuacions per a 5 preguntes.")
+        
+        with tab2:
+            if scores_10:
+                df_10 = create_ranking_df(scores_10)
+                st.dataframe(df_10, hide_index=True, use_container_width=True)
+            else:
+                st.info("Encara no hi ha puntuacions per a 10 preguntes.")
+                
+        with tab3:
+            if scores_20:
+                df_20 = create_ranking_df(scores_20)
+                st.dataframe(df_20, hide_index=True, use_container_width=True)
+            else:
+                st.info("Encara no hi ha puntuacions per a 20 preguntes.")
