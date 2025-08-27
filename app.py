@@ -39,7 +39,7 @@ def inject_custom_css():
     dark = st.session_state.get("dark_mode", False)
 
     if dark:
-        # ===== MODO FOSC =====
+        # ===== MODE FOSC =====
         st.markdown("""
         <style>
         :root {
@@ -153,11 +153,23 @@ def inject_custom_css():
             stroke: #1e90ff !important;
             color: #1e90ff !important;
         }
+
+        /* Botons de "Copia" — sempre amb bon contrast */
+        button[id*="copy_btn_"] {
+            background-color: var(--btn) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        button[id*="copy_btn_"]:hover {
+            background-color: var(--accent) !important;
+            color: #ffffff !important;
+            border-color: var(--accent) !important;
+        }
         </style>
         """, unsafe_allow_html=True)
 
     else:
-        # ===== MODO CLAR =====
+        # ===== MODE CLAR =====
         st.markdown("""
         <style>
         :root {
@@ -276,9 +288,21 @@ def inject_custom_css():
             stroke: #1e90ff !important;
             color: #1e90ff !important;
         }
+
+        /* Botons de "Copia" — sempre amb bon contrast */
+        button[id*="copy_btn_"] {
+            background-color: var(--btn) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        button[id*="copy_btn_"]:hover {
+            background-color: var(--accent) !important;
+            color: #ffffff !important;
+            border-color: var(--accent) !important;
+        }
         </style>
         """, unsafe_allow_html=True)
-
+        
 def render_ranking_table(df: pd.DataFrame, height: int = 360):
     """Renderiza el ranking coherente con el tema:
        - Oscuro: st.dataframe (interactivo, canvas)
@@ -1238,3 +1262,4 @@ elif opcio == "🏆 Ránquing Quiz":
                 render_ranking_table(df_20, 360)
             else:
                 st.info("Encara no hi ha puntuacions per a 20 preguntes.")
+
