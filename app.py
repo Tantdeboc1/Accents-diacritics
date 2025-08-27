@@ -7,6 +7,7 @@ import random
 import json, base64, requests, time
 import sys
 import logging
+import pandas as pd
 
 # 2. Configuración de logging
 logging.basicConfig(level=logging.INFO)
@@ -16,7 +17,7 @@ logger = logging.getLogger(__name__)
 def init_session_state():
     """Inicializa el estado de la sesión"""
     if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False  # Por defecto tema CLARO
+        st.session_state.dark_mode = False  # clar per defecte
     if "historial" not in st.session_state:
         st.session_state.historial = []
     if "quiz" not in st.session_state:
@@ -34,10 +35,11 @@ def init_session_state():
         st.session_state["menu"] = "🔍 Cerca un monosíl·lab"
 
 def inject_custom_css():
-    """CSS personalizado con soporte para tema oscuro y claro (contraste garantizado)."""
+    """CSS personalitzat amb suport per a mode fosc i clar, sense trencar DataFrame/canvas."""
     dark = st.session_state.get("dark_mode", False)
+
     if dark:
-        # ===== MODO OSCURO =====
+        # ===== MODO FOSC =====
         st.markdown("""
         <style>
         :root {
@@ -53,21 +55,21 @@ def inject_custom_css():
             --code-bg: #1a1a1a;
             --code-fg: #e0e0e0;
         }
+
         /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
             background-color: var(--bg) !important;
             color: var(--fg) !important;
         }
-        /* Texto común y encabezados */
         .stMarkdown, .stText, .stCaption, .stMetric, .stAlert, .stCodeBlock,
-        h1, h2, h3, h4, h5, h6, p, span, label {
-            color: var(--fg) !important;
-        }
+        h1, h2, h3, h4, h5, h6, p, span, label { color: var(--fg) !important; }
+
         /* Sidebar */
         [data-testid="stSidebar"], .sidebar .sidebar-content {
             background-color: var(--bg) !important;
             color: var(--fg) !important;
         }
+
         /* Inputs */
         .stTextInput > div > div > input,
         .stSelectbox > div > div,
@@ -77,22 +79,21 @@ def inject_custom_css():
             color: var(--fg) !important;
             border: 1px solid var(--border) !important;
         }
-        /* Botones */
+
+        /* Botons */
         .stButton > button {
             background-color: var(--btn) !important;
             color: var(--fg) !important;
             border: 1px solid var(--border) !important;
         }
-        .stButton > button:hover {
-            background-color: var(--btn-hover) !important;
-        }
-        /* Botón primario (Streamlit >=1.25) */
+        .stButton > button:hover { background-color: var(--btn-hover) !important; }
         button[data-testid="baseButton-primary"] {
             background-color: var(--accent) !important;
             border-color: var(--accent) !important;
             color: #ffffff !important;
         }
-        /* Bloques del quiz */
+
+        /* Blocs del quiz */
         .quiz-progress {
             background-color: #333333 !important;
             border-radius: 10px; padding: 10px; margin: 10px 0;
@@ -110,67 +111,60 @@ def inject_custom_css():
             border-radius: 5px; padding: 1rem; margin: 1rem 0;
             color: var(--fg) !important;
         }
-        /* DataFrame - ARREGLADO COMPLETO */
-        .stDataFrame, .stDataFrame div, .stDataFrame table, 
-        .stDataFrame th, .stDataFrame td, 
-        [data-testid="dataframe"], [data-testid="dataframe"] *,
-        [data-testid="dataframe"] table, [data-testid="dataframe"] tbody,
-        [data-testid="dataframe"] th, [data-testid="dataframe"] td,
-        [data-testid="stDataFrame"], [data-testid="stDataFrame"] *,
-        div[data-testid="dataframe"] table tbody tr td,
-        div[data-testid="dataframe"] table thead tr th {
+
+        /* DataFrame (fosc) */
+        [data-testid="stDataFrame"] {
             background-color: var(--bg-2) !important;
             color: var(--fg) !important;
-            border-color: #e9ecef !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 6px;
         }
-        
-        /* Sidebar toggle button - MODO OSCURO */
-        [data-testid="collapsedControl"] {
-            color: #ffffff !important;
+        [data-testid="stDataFrame"] table th,
+        [data-testid="stDataFrame"] table td {
+            background-color: var(--bg-2) !important;
+            color: var(--fg) !important;
+            border-color: var(--border) !important;
+        }
+        [data-testid="stDataFrame"] canvas {
+            image-rendering: auto !important;
             background-color: var(--bg-2) !important;
         }
-        
-        [data-testid="collapsedControl"] svg {
-            fill: #ffffff !important;
-        }
-        
-        /* Tooltip/help text */
-        .stTooltipIcon, [data-testid="stTooltipHoverTarget"],
-        [role="tooltip"], div[data-baseweb="tooltip"] {
-            background-color: var(--bg-3) !important;
-            color: var(--fg) !important;
-            border: 1px solid #e9ecef !important;
-        }
-        
-        /* Code blocks - ARREGLADO para que se vean en modo oscuro */
-        .stCode, .stCodeBlock, 
-        .stCode > div, .stCodeBlock > div, 
-        .stCode pre, .stCodeBlock pre, 
-        .stCode code, .stCodeBlock code,
-        [data-testid="stCodeBlock"],
-        [data-testid="stCodeBlock"] *,
-        pre, code {
+
+        /* Codi */
+        .stCode, .stCodeBlock, [data-testid="stCodeBlock"], pre, code {
             background-color: var(--code-bg) !important;
             color: var(--code-fg) !important;
             border: 1px solid var(--border) !important;
         }
-        
-        /* Monosílabs acentuats en blau per a 'Definició' */
-        .accented {
+
+        /* Monosíl·labs acentuats */
+        .accented { color: #1e90ff !important; font-weight: 600; }
+
+        /* Botó minimitzar sidebar — sempre blau */
+        header [data-testid="collapsedControl"] svg,
+        header [data-testid="collapsedControl"] svg *,
+        header button[title*="sidebar" i] svg,
+        header button[title*="sidebar" i] svg *,
+        header button[aria-label*="sidebar" i] svg,
+        header button[aria-label*="sidebar" i] svg *,
+        header [data-testid^="baseButton"] svg,
+        header [data-testid^="baseButton"] svg * {
+            fill: #1e90ff !important;
+            stroke: #1e90ff !important;
             color: #1e90ff !important;
-            font-weight: 600;
         }
         </style>
         """, unsafe_allow_html=True)
+
     else:
-        # ===== MODO CLARO =====
+        # ===== MODO CLAR =====
         st.markdown("""
         <style>
         :root {
             --bg: #ffffff;
             --bg-2: #ffffff;
             --bg-3: #ffffff;
-            --fg: #111827;        /* gris muy oscuro (mejor que negro puro) */
+            --fg: #111827;
             --muted: #374151;
             --border: #d1d5db;
             --accent: #0066cc;
@@ -179,21 +173,21 @@ def inject_custom_css():
             --code-bg: #f8f9fa;
             --code-fg: #333333;
         }
+
         /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
             background-color: var(--bg) !important;
             color: var(--fg) !important;
         }
-        /* Texto común y encabezados */
         .stMarkdown, .stText, .stCaption, .stMetric, .stAlert, .stCodeBlock,
-        h1, h2, h3, h4, h5, h6, p, span, label {
-            color: var(--fg) !important;
-        }
+        h1, h2, h3, h4, h5, h6, p, span, label { color: var(--fg) !important; }
+
         /* Sidebar */
         [data-testid="stSidebar"], .sidebar .sidebar-content {
             background-color: #f8f9fa !important;
             color: var(--fg) !important;
         }
+
         /* Inputs */
         .stTextInput > div > div > input,
         .stSelectbox > div > div,
@@ -203,7 +197,8 @@ def inject_custom_css():
             color: var(--fg) !important;
             border: 1px solid var(--border) !important;
         }
-        /* Botones */
+
+        /* Botons */
         .stButton > button {
             background-color: var(--btn) !important;
             color: var(--fg) !important;
@@ -213,13 +208,13 @@ def inject_custom_css():
             background-color: var(--btn-hover) !important;
             border: 1px solid #adb5bd !important;
         }
-        /* Botón primario (Streamlit >=1.25) */
         button[data-testid="baseButton-primary"] {
             background-color: var(--accent) !important;
             border-color: var(--accent) !important;
             color: #ffffff !important;
         }
-        /* Bloques del quiz */
+
+        /* Blocs del quiz */
         .quiz-progress {
             background-color: #f8f9fa;
             border-radius: 10px; padding: 10px; margin: 10px 0;
@@ -239,38 +234,79 @@ def inject_custom_css():
             border-radius: 5px; padding: 1rem; margin: 1rem 0;
             color: #0f5132 !important;
         }
-        /* DataFrame - ARREGLADO */
-        .stDataFrame, .stDataFrame div, .stDataFrame table, 
-        .stDataFrame th, .stDataFrame td,
-        [data-testid="dataframe"] *, 
-        [data-testid="dataframe"] table,
-        [data-testid="dataframe"] th,
-        [data-testid="dataframe"] td {
+
+        /* DataFrame (clar) */
+        [data-testid="stDataFrame"] {
             background-color: var(--bg-2) !important;
             color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+            border-radius: 6px;
         }
-        
-        /* Code blocks - ARREGLADO para que se vean en modo claro */
-        .stCode, .stCodeBlock, 
-        .stCode > div, .stCodeBlock > div, 
-        .stCode pre, .stCodeBlock pre, 
-        .stCode code, .stCodeBlock code,
-        [data-testid="stCodeBlock"],
-        [data-testid="stCodeBlock"] *,
-        pre, code {
+        [data-testid="stDataFrame"] table th,
+        [data-testid="stDataFrame"] table td {
+            background-color: var(--bg-2) !important;
+            color: var(--fg) !important;
+            border-color: var(--border) !important;
+        }
+        [data-testid="stDataFrame"] canvas {
+            image-rendering: auto !important;
+            background-color: var(--bg-2) !important;
+        }
+
+        /* Codi */
+        .stCode, .stCodeBlock, [data-testid="stCodeBlock"], pre, code {
             background-color: var(--code-bg) !important;
             color: var(--code-fg) !important;
             border: 1px solid #e9ecef !important;
         }
-        
-        /* Monosílabs acentuats en blau per a 'Definició' */
-        .accented {
+
+        /* Monosíl·labs acentuats */
+        .accented { color: #1e90ff !important; font-weight: 600; }
+
+        /* Botó minimitzar sidebar — sempre blau */
+        header [data-testid="collapsedControl"] svg,
+        header [data-testid="collapsedControl"] svg *,
+        header button[title*="sidebar" i] svg,
+        header button[title*="sidebar" i] svg *,
+        header button[aria-label*="sidebar" i] svg,
+        header button[aria-label*="sidebar" i] svg *,
+        header [data-testid^="baseButton"] svg,
+        header [data-testid^="baseButton"] svg * {
+            fill: #1e90ff !important;
+            stroke: #1e90ff !important;
             color: #1e90ff !important;
-            font-weight: 600;
         }
         </style>
         """, unsafe_allow_html=True)
 
+def render_ranking_table(df: pd.DataFrame, height: int = 360):
+    """Renderiza el ranking coherente con el tema:
+       - Oscuro: st.dataframe (interactivo, canvas)
+       - Claro:  st.table con pd.Styler (HTML) para fondo claro / texto oscuro
+    """
+    dark = st.session_state.get("dark_mode", False)
+
+    if dark:
+        st.dataframe(df, hide_index=True, use_container_width=True, height=height)
+    else:
+        styler = (
+            df.style
+              .set_properties(**{
+                  "background-color": "#ffffff",
+                  "color": "#111827",
+                  "border-color": "#e5e7eb"
+              })
+              .set_table_styles([
+                  {"selector": "thead th",
+                   "props": "background-color:#f8f9fa; color:#111827; border:1px solid #e5e7eb;"},
+                  {"selector": "tbody td",
+                   "props": "border:1px solid #e5e7eb;"},
+                  {"selector": "tbody tr:nth-child(even) td",
+                   "props": "background-color:#fcfcfc;"}
+              ])
+              .hide(axis="index")
+        )
+        st.table(styler)
 
 def show_quiz_progress(current_question: int, total_questions: int, answered_count: int = None):
     """Muestra progreso del quiz"""
@@ -291,7 +327,6 @@ def _is_accented(word: str) -> bool:
 def color_word(word: str) -> str:
     # Devuelve la palabra sin color
     return word
-
 
 def highlight_accented(text: str) -> str:
     """Ya no resalta los monosílabs acentuados"""
@@ -453,7 +488,7 @@ def load_scores_from_github():
                 scores.append(json.loads(line))
         return scores, sha
     except Exception as e:
-        st.error(f"Error leyendo ránking de GitHub: {e}")
+        st.error(f"Error leyendo ránquing de GitHub: {e}")
         return [], None
 
 def append_score_to_github(record: dict, max_retries=3):
@@ -493,7 +528,7 @@ def append_score_to_github(record: dict, max_retries=3):
             return True
         except Exception as e:
             if attempt == max_retries - 1:
-                st.error(f"No se ha podido guardar en el ránking (GitHub): {e}")
+                st.error(f"No se ha podido guardar en el ránquing (GitHub): {e}")
                 return False
             time.sleep(0.8)
     return False
@@ -833,8 +868,18 @@ try:
             'About': None
         }
     )
-    
-    # Inyectar CSS personalizado
+
+    # ====== TEMA: inicializar y conmutar ANTES de inyectar CSS ======
+    with st.sidebar:
+        toggle_label = "Canvia a mode fosc" if not st.session_state.dark_mode else "Canvia a mode clar"
+        new_dark = st.toggle(toggle_label, value=st.session_state.dark_mode, key="__theme_toggle")
+
+    if new_dark != st.session_state.dark_mode:
+        st.session_state.dark_mode = new_dark
+        st.rerun()
+    # ================================================================
+
+    # Inyectar CSS personalizado (UNA sola vez)
     inject_custom_css()
 
 except Exception as e:
@@ -842,8 +887,9 @@ except Exception as e:
     logger.exception("Error en la aplicación")
     raise
 
-# Inyectar CSS personalizado AL INICIO
-inject_custom_css()
+# (Eliminado) — NO volver a inyectar CSS aquí
+# inject_custom_css()
+
 col_title, col_theme = st.columns([4, 1])
 
 with col_title:
@@ -878,16 +924,7 @@ MENU_RANK = "🏆 Ránquing Quiz"
 with st.sidebar:
     st.header("📋 Menú")
 
-    # Indicador de tema actual
-    theme_icon = "☀️" if st.session_state.dark_mode else "🌙"
-    theme_text = "Canviar a tema clar" if st.session_state.dark_mode else "Canviar a tema fosc"
-    
-    # ARREGLO: No usar rerun_safe() aquí, solo cambiar el estado
-    if st.button(f"{theme_icon} {theme_text}", key="theme_toggle"):
-        st.session_state.dark_mode = not st.session_state.dark_mode
-        # NO hacer rerun aquí para mantener la página actual
-
-    # El radio lee/escribe directamente en session_state["menu"]
+       # El radio lee/escribe directamente en session_state["menu"]
     st.radio(
         "Acció",
         [
@@ -1177,29 +1214,27 @@ elif opcio == "🏆 Ránquing Quiz":
                     "%": round(100 * num / den),
                     "Data": r.get("data", "—"),
                 })
-
             return pd.DataFrame(rows)
-
         # Crear tabs para cada ranking
         tab1, tab2, tab3 = st.tabs(["5 preguntes", "10 preguntes", "20 preguntes"])
         
         with tab1:
             if scores_5:
                 df_5 = create_ranking_df(scores_5)
-                st.dataframe(df_5, hide_index=True, use_container_width=True)
+                render_ranking_table(df_5, 360)
             else:
                 st.info("Encara no hi ha puntuacions per a 5 preguntes.")
         
         with tab2:
             if scores_10:
                 df_10 = create_ranking_df(scores_10)
-                st.dataframe(df_10, hide_index=True, use_container_width=True)
+                render_ranking_table(df_10, 360)
             else:
                 st.info("Encara no hi ha puntuacions per a 10 preguntes.")
                 
         with tab3:
             if scores_20:
                 df_20 = create_ranking_df(scores_20)
-                st.dataframe(df_20, hide_index=True, use_container_width=True)
+                render_ranking_table(df_20, 360)
             else:
                 st.info("Encara no hi ha puntuacions per a 20 preguntes.")
