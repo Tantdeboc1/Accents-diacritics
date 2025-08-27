@@ -80,7 +80,7 @@ def inject_custom_css():
             border: 1px solid var(--border) !important;
         }
 
-        /* Botons */
+        /* Botons base i primaris */
         .stButton > button {
             background-color: var(--btn) !important;
             color: var(--fg) !important;
@@ -140,31 +140,16 @@ def inject_custom_css():
         /* Monosíl·labs acentuats */
         .accented { color: #1e90ff !important; font-weight: 600; }
 
-        /* Botó minimitzar sidebar — sempre blau */
-        header [data-testid="collapsedControl"] svg,
-        header [data-testid="collapsedControl"] svg *,
-        header button[title*="sidebar" i] svg,
-        header button[title*="sidebar" i] svg *,
-        header button[aria-label*="sidebar" i] svg,
-        header button[aria-label*="sidebar" i] svg *,
-        header [data-testid^="baseButton"] svg,
-        header [data-testid^="baseButton"] svg * {
-            fill: #1e90ff !important;
-            stroke: #1e90ff !important;
-            color: #1e90ff !important;
+        /* Tooltips en mode fosc (fons clar + text fosc) */
+        [data-testid="stTooltipContent"],
+        div[role="tooltip"] {
+            background: #f5f7fa !important;
+            color: #111827 !important;
+            border: 1px solid #e5e7eb !important;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.35) !important;
+            z-index: 9999 !important;
         }
-
-        /* Botons de "Copia" — sempre amb bon contrast */
-        button[id*="copy_btn_"] {
-            background-color: var(--btn) !important;
-            color: var(--fg) !important;
-            border: 1px solid var(--border) !important;
-        }
-        button[id*="copy_btn_"]:hover {
-            background-color: var(--accent) !important;
-            color: #ffffff !important;
-            border-color: var(--accent) !important;
-        }
+        div[role="tooltip"] * { color: inherit !important; }
         </style>
         """, unsafe_allow_html=True)
 
@@ -210,7 +195,7 @@ def inject_custom_css():
             border: 1px solid var(--border) !important;
         }
 
-        /* Botons */
+        /* Botons base i primaris */
         .stButton > button {
             background-color: var(--btn) !important;
             color: var(--fg) !important;
@@ -275,34 +260,19 @@ def inject_custom_css():
         /* Monosíl·labs acentuats */
         .accented { color: #1e90ff !important; font-weight: 600; }
 
-        /* Botó minimitzar sidebar — sempre blau */
-        header [data-testid="collapsedControl"] svg,
-        header [data-testid="collapsedControl"] svg *,
-        header button[title*="sidebar" i] svg,
-        header button[title*="sidebar" i] svg *,
-        header button[aria-label*="sidebar" i] svg,
-        header button[aria-label*="sidebar" i] svg *,
-        header [data-testid^="baseButton"] svg,
-        header [data-testid^="baseButton"] svg * {
-            fill: #1e90ff !important;
-            stroke: #1e90ff !important;
-            color: #1e90ff !important;
-        }
-
-        /* Botons de "Copia" — sempre amb bon contrast */
-        button[id*="copy_btn_"] {
-            background-color: var(--btn) !important;
-            color: var(--fg) !important;
-            border: 1px solid var(--border) !important;
-        }
-        button[id*="copy_btn_"]:hover {
-            background-color: var(--accent) !important;
+        /* Tooltips en mode clar (fons fosc + text clar) */
+        [data-testid="stTooltipContent"],
+        div[role="tooltip"] {
+            background: #111827 !important;
             color: #ffffff !important;
-            border-color: var(--accent) !important;
+            border: 1px solid #111827 !important;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
+            z-index: 9999 !important;
         }
+        div[role="tooltip"] * { color: inherit !important; }
         </style>
         """, unsafe_allow_html=True)
-        
+
 def render_ranking_table(df: pd.DataFrame, height: int = 360):
     """Renderiza el ranking coherente con el tema:
        - Oscuro: st.dataframe (interactivo, canvas)
@@ -386,8 +356,11 @@ def display_word_info(paraula: str):
     
     # Botones en columnas
     col1, col2 = st.columns(2)
+
     with col1:
-        st.button("Copia", help="Selecciona el bloc i copia'l", key=f"copy_btn_{paraula}")
+        st.markdown('<div class="copy-btn-wrap">', unsafe_allow_html=True)
+        st.button("Copia", help="Selecciona el bloc i copia'l",
+          key=f"copy_btn_{paraula}", type="primary")
     with col2:
         if st.button("Generar nous exemples", key=f"new_examples_{paraula}"):
             st.session_state[f"examples_{paraula}"] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
@@ -420,7 +393,9 @@ def display_word_info(paraula: str):
             # Botones en columnas para la pareja
             col3, col4 = st.columns(2)
             with col3:
-                st.button("Copia", help="Selecciona el bloc i copia'l", key=f"copy_btn_{altra}")
+                st.markdown('<div class="copy-btn-wrap">', unsafe_allow_html=True)
+                st.button("Copia", help="Selecciona el bloc i copia'l",
+                  key=f"copy_btn_{altra}", type="primary")
             with col4:
                 if st.button("Generar nous exemples", key=f"new_examples_{altra}"):
                     st.session_state[f"examples_{altra}"] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
@@ -1238,7 +1213,9 @@ elif opcio == "🏆 Ránquing Quiz":
                     "%": round(100 * num / den),
                     "Data": r.get("data", "—"),
                 })
+
             return pd.DataFrame(rows)
+
         # Crear tabs para cada ranking
         tab1, tab2, tab3 = st.tabs(["5 preguntes", "10 preguntes", "20 preguntes"])
         
@@ -1262,4 +1239,3 @@ elif opcio == "🏆 Ránquing Quiz":
                 render_ranking_table(df_20, 360)
             else:
                 st.info("Encara no hi ha puntuacions per a 20 preguntes.")
-
