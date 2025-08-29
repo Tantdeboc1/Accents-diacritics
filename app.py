@@ -1,39 +1,52 @@
-# 1. Primero las importaciones
+# =========================
+# app.py — Monosíl·labs
+# =========================
 import streamlit as st
-import unicodedata
-import re
-from datetime import datetime
+import pandas as pd
 import random
 import json, base64, requests, time
-import sys
-import logging
-import pandas as pd
+import unicodedata, re
+from datetime import datetime
 
-# 2. Configuración de logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# -------------------------
+# Config de página (una vez)
+# -------------------------
+st.set_page_config(
+    page_title="📘 Monosíl·labs: accents diacrìtics en valencià",
+    page_icon="📘",
+    layout="centered",
+    initial_sidebar_state="expanded",
+    menu_items={
+        "Get Help": None,
+        "Report a bug": None,
+        "About": None
+    }
+)
 
-# 3. Definir TODAS las funciones ANTES de usarlas
-def init_session_state():
-    """Inicializa el estado de la sesión"""
-    if "dark_mode" not in st.session_state:
-        st.session_state.dark_mode = False  # clar per defecte
-    if "historial" not in st.session_state:
-        st.session_state.historial = []
-    if "quiz" not in st.session_state:
-        st.session_state.quiz = None
-    if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10
-    if "scores" not in st.session_state:
-        st.session_state.scores = []
-    if "quiz_corrected" not in st.session_state:
-        st.session_state.quiz_corrected = False
-    if "last_score" not in st.session_state:
-        st.session_state.last_score = {}
-    # Inicializar menú por defecto si no existe
-    if "menu" not in st.session_state:
-        st.session_state["menu"] = "🔍 Cerca un monosíl·lab"
+# -------------------------
+# Estado inicial seguro
+# -------------------------
+if "dark_mode" not in st.session_state:
+    st.session_state.dark_mode = False
+if "menu" not in st.session_state:
+    st.session_state.menu = "🔍 Cerca un monosíl·lab"
+if "historial" not in st.session_state:
+    st.session_state.historial = []
+if "quiz" not in st.session_state:
+    st.session_state.quiz = None
+if "quiz_n" not in st.session_state:
+    st.session_state.quiz_n = 10
+if "quiz_corrected" not in st.session_state:
+    st.session_state.quiz_corrected = False
+if "last_score" not in st.session_state:
+    st.session_state.last_score = {}
+if "scores" not in st.session_state:
+    st.session_state.scores = []
 
+
+# -------------------------
+# CSS (usa session_state.dark_mode)
+# -------------------------
 def inject_custom_css():
     """CSS personalitzat amb suport per a mode fosc i clar, sense trencar DataFrame/canvas."""
     dark = st.session_state.get("dark_mode", False)
@@ -43,20 +56,12 @@ def inject_custom_css():
         st.markdown("""
         <style>
         :root {
-            --bg: #1e1e1e;
-            --bg-2: #2a2a2a;
-            --bg-3: #2d2d2d;
-            --fg: #f5f7fa;
-            --muted: #cbd5e1;
-            --border: #404040;
-            --accent: #4a9eff;
-            --btn: #2d2d2d;
-            --btn-hover: #404040;
-            --code-bg: #1a1a1a;
-            --code-fg: #e0e0e0;
+            --bg: #1e1e1e; --bg-2: #2a2a2a; --bg-3: #2d2d2d;
+            --fg: #f5f7fa; --border: #404040; --accent: #4a9eff;
+            --btn: #2d2d2d; --btn-hover: #404040;
+            --code-bg: #1a1a1a; --code-fg: #e0e0e0;
         }
 
-        /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
             background-color: var(--bg) !important;
             color: var(--fg) !important;
@@ -65,15 +70,19 @@ def inject_custom_css():
         h1, h2, h3, h4, h5, h6, p, span, label { color: var(--fg) !important; }
 
         /* Sidebar */
-        [data-testid="stSidebar"], .sidebar .sidebar-content {
-            background-color: var(--bg) !important;
+        [data-testid="stSidebar"] {
+            background-color: var(--bg-2) !important;
             color: var(--fg) !important;
         }
+        [data-testid="stSidebar"] h1, 
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label { color: var(--fg) !important; }
 
         /* Inputs */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div,
-        .stRadio > div,
+        .stTextInput input,
         .stTextArea textarea {
             background-color: var(--bg-3) !important;
             color: var(--fg) !important;
@@ -93,26 +102,15 @@ def inject_custom_css():
             color: #ffffff !important;
         }
 
-        /* Blocs del quiz */
-        .quiz-progress {
-            background-color: #333333 !important;
-            border-radius: 10px; padding: 10px; margin: 10px 0;
-            border-left: 4px solid var(--accent);
-        }
+        /* Blocs quiz */
         .quiz-question {
             border-left: 4px solid var(--accent);
-            padding-left: 1rem; margin: 1rem 0;
+            padding: 1rem; margin: 1rem 0;
             background-color: var(--bg-2);
-            border-radius: 5px; padding: 1rem;
-            border: 1px solid var(--border);
-        }
-        .success-score {
-            background-color: #1a472a; border: 1px solid #2d5a3d;
-            border-radius: 5px; padding: 1rem; margin: 1rem 0;
-            color: var(--fg) !important;
+            border-radius: 6px; border: 1px solid var(--border);
         }
 
-        /* DataFrame (fosc) */
+        /* DataFrame (fosc): contenidor i canvas */
         [data-testid="stDataFrame"] {
             background-color: var(--bg-2) !important;
             color: var(--fg) !important;
@@ -126,8 +124,8 @@ def inject_custom_css():
             border-color: var(--border) !important;
         }
         [data-testid="stDataFrame"] canvas {
-            image-rendering: auto !important;
             background-color: var(--bg-2) !important;
+            image-rendering: auto !important;
         }
 
         /* Codi */
@@ -137,10 +135,7 @@ def inject_custom_css():
             border: 1px solid var(--border) !important;
         }
 
-        /* Monosíl·labs acentuats */
-        .accented { color: #1e90ff !important; font-weight: 600; }
-
-        /* Tooltips en mode fosc (fons clar + text fosc) */
+        /* Tooltips (fosc) — fons clar + text fosc */
         [data-testid="stTooltipContent"],
         div[role="tooltip"] {
             background: #f5f7fa !important;
@@ -150,6 +145,9 @@ def inject_custom_css():
             z-index: 9999 !important;
         }
         div[role="tooltip"] * { color: inherit !important; }
+
+        /* Accent per a subratllats puntuals */
+        .accented { color: #1e90ff !important; font-weight: 600; }
         </style>
         """, unsafe_allow_html=True)
 
@@ -158,20 +156,12 @@ def inject_custom_css():
         st.markdown("""
         <style>
         :root {
-            --bg: #ffffff;
-            --bg-2: #ffffff;
-            --bg-3: #ffffff;
-            --fg: #111827;
-            --muted: #374151;
-            --border: #d1d5db;
-            --accent: #0066cc;
-            --btn: #f8f9fa;
-            --btn-hover: #e9ecef;
-            --code-bg: #f8f9fa;
-            --code-fg: #333333;
+            --bg: #ffffff; --bg-2: #f8f9fa; --bg-3: #ffffff;
+            --fg: #111827; --muted: #374151; --border: #d1d5db;
+            --accent: #0066cc; --btn: #ffffff; --btn-hover: #e9ecef;
+            --code-bg: #f8f9fa; --code-fg: #333333;
         }
 
-        /* Base */
         html, body, .stApp, [data-testid="stAppViewContainer"], .block-container {
             background-color: var(--bg) !important;
             color: var(--fg) !important;
@@ -179,23 +169,50 @@ def inject_custom_css():
         .stMarkdown, .stText, .stCaption, .stMetric, .stAlert, .stCodeBlock,
         h1, h2, h3, h4, h5, h6, p, span, label { color: var(--fg) !important; }
 
-        /* Sidebar */
-        [data-testid="stSidebar"], .sidebar .sidebar-content {
-            background-color: #f8f9fa !important;
-            color: var(--fg) !important;
-        }
+        /* Sidebar (clar) */
+        [data-testid="stSidebar"] { background-color: var(--bg-2) !important; }
+        [data-testid="stSidebar"] h1, 
+        [data-testid="stSidebar"] h2,
+        [data-testid="stSidebar"] h3,
+        [data-testid="stSidebar"] p,
+        [data-testid="stSidebar"] span,
+        [data-testid="stSidebar"] label { color: var(--fg) !important; }
 
-        /* Inputs */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div,
-        .stRadio > div,
+        /* Inputs text & focus */
+        .stTextInput input {
+            background-color: var(--bg) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+        .stTextInput input:focus {
+            border-color: var(--accent) !important;
+            box-shadow: 0 0 0 1px var(--accent) inset !important;
+        }
+        .stTextInput input::placeholder { color: #6b7280 !important; }
         .stTextArea textarea {
-            background-color: var(--bg-3) !important;
+            background-color: var(--bg) !important;
             color: var(--fg) !important;
             border: 1px solid var(--border) !important;
         }
 
-        /* Botons base i primaris */
+        /* Selectbox control cerrado */
+        .stSelectbox [data-baseweb="select"],
+        .stSelectbox [data-baseweb="select"] > div {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        .stSelectbox [data-baseweb="select"] input,
+        .stSelectbox [data-baseweb="select"] [data-baseweb="single-value"],
+        .stSelectbox [data-baseweb="select"] [data-baseweb="placeholder"] {
+            color: #111827 !important;
+        }
+        .stSelectbox svg, .stSelectbox svg * {
+            fill: #111827 !important;
+            stroke: #111827 !important;
+        }
+
+        /* Botones */
         .stButton > button {
             background-color: var(--btn) !important;
             color: var(--fg) !important;
@@ -203,7 +220,6 @@ def inject_custom_css():
         }
         .stButton > button:hover {
             background-color: var(--btn-hover) !important;
-            border: 1px solid #adb5bd !important;
         }
         button[data-testid="baseButton-primary"] {
             background-color: var(--accent) !important;
@@ -211,636 +227,114 @@ def inject_custom_css():
             color: #ffffff !important;
         }
 
-        /* Blocs del quiz */
-        .quiz-progress {
-            background-color: #f8f9fa;
-            border-radius: 10px; padding: 10px; margin: 10px 0;
-            border-left: 4px solid var(--accent);
-            border: 1px solid #e9ecef;
-        }
+        /* Bloques quiz */
         .quiz-question {
             border-left: 4px solid var(--accent);
-            padding-left: 1rem; margin: 1rem 0;
-            background-color: var(--bg-2);
-            border-radius: 5px; padding: 1rem;
-            border: 1px solid #e9ecef;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-        }
-        .success-score {
-            background-color: #d4edda; border: 1px solid #c3e6cb;
-            border-radius: 5px; padding: 1rem; margin: 1rem 0;
-            color: #0f5132 !important;
+            padding: 1rem; margin: 1rem 0;
+            background-color: var(--bg);
+            border-radius: 6px; border: 1px solid var(--border);
         }
 
-        /* DataFrame (clar) */
-        [data-testid="stDataFrame"] {
-            background-color: var(--bg-2) !important;
+        /* DataFrame claro */
+        [data-testid="stDataFrame"],
+        [data-testid="stDataFrame"] table,
+        [data-testid="stDataFrame"] th,
+        [data-testid="stDataFrame"] td,
+        [data-testid="stDataFrame"] canvas {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border-color: #e5e7eb !important;
+        }
+
+        /* Tabs claro */
+        [data-testid="stTabs"] [role="tablist"] {
+            background-color: #ffffff !important;
+            border-bottom: 1px solid #e5e7eb !important;
+        }
+        [data-testid="stTabs"] [role="tab"] {
+            background-color: #f8f9fa !important;
+            color: #111827 !important;
+            border: 1px solid #e5e7eb !important;
+        }
+        [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
+
+        /* Código */
+        .stCode, .stCodeBlock, [data-testid="stCodeBlock"], pre, code {
+            background-color: var(--bg) !important;
             color: var(--fg) !important;
             border: 1px solid var(--border) !important;
-            border-radius: 6px;
-        }
-        [data-testid="stDataFrame"] table th,
-        [data-testid="stDataFrame"] table td {
-            background-color: var(--bg-2) !important;
-            color: var(--fg) !important;
-            border-color: var(--border) !important;
-        }
-        [data-testid="stDataFrame"] canvas {
-            image-rendering: auto !important;
-            background-color: var(--bg-2) !important;
         }
 
-        /* Codi */
-        .stCode, .stCodeBlock, [data-testid="stCodeBlock"], pre, code {
-            background-color: var(--code-bg) !important;
-            color: var(--code-fg) !important;
-            border: 1px solid #e9ecef !important;
-        }
-
-        /* Monosíl·labs acentuats */
-        .accented { color: #1e90ff !important; font-weight: 600; }
-
-        /* Tooltips en mode clar (fons fosc + text clar) */
+        /* Tooltips (clar) */
         [data-testid="stTooltipContent"],
         div[role="tooltip"] {
             background: #111827 !important;
             color: #ffffff !important;
-            border: 1px solid #111827 !important;
-            box-shadow: 0 6px 18px rgba(0,0,0,0.18) !important;
-            z-index: 9999 !important;
         }
-        div[role="tooltip"] * { color: inherit !important; }
+
+        /* Expander */
+        [data-testid="stExpander"],
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+            background-color: var(--bg) !important;
+            color: var(--fg) !important;
+            border: 1px solid var(--border) !important;
+        }
+
+        .accented { color: #0066cc !important; font-weight: 600; }
+
+        /* === OVERRIDE nuclear: popover/selectbox siempre blanco en modo claro === */
+        :root body [data-baseweb="popover"],
+        :root body [data-baseweb="popover"] *,
+        :root body div[role="listbox"],
+        :root body div[role="listbox"] *,
+        :root body [data-baseweb="menu"],
+        :root body [data-baseweb="menu"] * {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border-color: #d1d5db !important;
+        }
+        div[role="listbox"] [role="option"],
+        [data-baseweb="menu"] [role="option"],
+        [data-baseweb="menu"] li {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
+        div[role="listbox"] [role="option"]:hover,
+        div[role="listbox"] [role="option"][aria-selected="true"],
+        [data-baseweb="menu"] [role="option"]:hover,
+        [data-baseweb="menu"] [role="option"][aria-selected="true"],
+        [data-baseweb="menu"] li:hover {
+            background-color: #eef3f8 !important;
+            color: #111827 !important;
+        }
         </style>
         """, unsafe_allow_html=True)
+# -------------------------
+# Toggle de tema (antes del CSS)
+# -------------------------
+with st.sidebar:
+    toggle_label = "Canvia a mode fosc" if not st.session_state.dark_mode else "Canvia a mode clar"
+    new_dark = st.toggle(toggle_label, value=st.session_state.dark_mode, key="__theme_toggle")
+if new_dark != st.session_state.dark_mode:
+    st.session_state.dark_mode = new_dark
+    st.rerun()
 
-def render_ranking_table(df: pd.DataFrame, height: int = 360):
-    """Renderiza el ranking coherente con el tema:
-       - Oscuro: st.dataframe (interactivo, canvas)
-       - Claro:  st.table con pd.Styler (HTML) para fondo claro / texto oscuro
-    """
-    dark = st.session_state.get("dark_mode", False)
+# Inyectar CSS una sola vez
+inject_custom_css()
 
-    if dark:
-        st.dataframe(df, hide_index=True, use_container_width=True, height=height)
-    else:
-        styler = (
-            df.style
-              .set_properties(**{
-                  "background-color": "#ffffff",
-                  "color": "#111827",
-                  "border-color": "#e5e7eb"
-              })
-              .set_table_styles([
-                  {"selector": "thead th",
-                   "props": "background-color:#f8f9fa; color:#111827; border:1px solid #e5e7eb;"},
-                  {"selector": "tbody td",
-                   "props": "border:1px solid #e5e7eb;"},
-                  {"selector": "tbody tr:nth-child(even) td",
-                   "props": "background-color:#fcfcfc;"}
-              ])
-              .hide(axis="index")
-        )
-        st.table(styler)
 
-def show_quiz_progress(current_question: int, total_questions: int, answered_count: int = None):
-    """Muestra progreso del quiz"""
-    if answered_count is not None:
-        progress = answered_count / total_questions
-        st.progress(progress)
-        st.caption(f"Respondidas {answered_count} de {total_questions} preguntas")
-    else:
-        progress = current_question / total_questions
-        st.progress(progress)
-        st.caption(f"Pregunta {current_question} de {total_questions}")
-
-def _is_accented(word: str) -> bool:
-    # True si la palabra tiene marca diacrítica (á, é, í, ó, ú, à, è, ò, ï, ü, etc.)
-    nfd = unicodedata.normalize("NFD", word or "")
-    return any(unicodedata.category(ch) == "Mn" for ch in nfd)
-
-def color_word(word: str) -> str:
-    # Devuelve la palabra sin color
-    return word
-
-def highlight_accented(text: str) -> str:
-    """Ya no resalta los monosílabs acentuados"""
-    return text
-
-def search_suggestions(prefix: str):
-     """Sugerencias por inicial (sin quitar acentos)."""
-     inicial = prefix.strip().lower()[:1]
-     return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
-
-def display_word_info(paraula: str):
-    info = monosilabos[paraula]
-
-    # — Títol de la paraula en color —
-    st.markdown(f"### — {color_word(paraula)} —")
-    st.write("**Categoria:**", info.get("categoria", "—"))
-    st.write("**Definició:**", info["definicion"])
-
-    # Generar key único para ejemplos basado en session_state
-    if f"examples_{paraula}" not in st.session_state:
-        st.session_state[f"examples_{paraula}"] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
-    
-    ej = st.session_state[f"examples_{paraula}"]
-    
-    # Exemples
-    st.write("**Exemples:**")
-    for ex in ej:
-        st.markdown("- " + ex)
-
-    # Bloc per copiar: definició + exemples mostrats
-    bloc = f"{paraula.capitalize()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
-    st.code(bloc)
-    
-    # Botones en columnas
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown('<div class="copy-btn-wrap">', unsafe_allow_html=True)
-        st.button("Copia", help="Selecciona el bloc i copia'l",
-          key=f"copy_btn_{paraula}", type="primary")
-    with col2:
-        if st.button("Generar nous exemples", key=f"new_examples_{paraula}"):
-            st.session_state[f"examples_{paraula}"] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
-            st.rerun()
-
-    # — Contrast (si existeix) —
-    if paraula in parelles:
-        altra = parelles[paraula]
-        if altra in monosilabos:
-            info2 = monosilabos[altra]
-            st.markdown(f"### — {color_word(altra)} — *_(contrast)_*")
-            st.write("**Categoria:**", info2.get("categoria", "—"))
-            st.write("**Definició:**", info2["definicion"])
-
-            # Generar key único para ejemplos de la pareja
-            if f"examples_{altra}" not in st.session_state:
-                st.session_state[f"examples_{altra}"] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
-            
-            ej2 = st.session_state[f"examples_{altra}"]
-
-            # Exemples de la parella
-            st.write("**Exemples:**")
-            for ex in ej2:
-                st.markdown("- " + ex)
-
-            # Bloc per copiar de la paraula contrast
-            bloc2 = f"{altra.capitalize()}\n{info2['definicion']}\n" + "\n".join(f"- {e}" for e in ej2)
-            st.code(bloc2)
-            
-            # Botones en columnas para la pareja
-            col3, col4 = st.columns(2)
-            with col3:
-                st.markdown('<div class="copy-btn-wrap">', unsafe_allow_html=True)
-                st.button("Copia", help="Selecciona el bloc i copia'l",
-                  key=f"copy_btn_{altra}", type="primary")
-            with col4:
-                if st.button("Generar nous exemples", key=f"new_examples_{altra}"):
-                    st.session_state[f"examples_{altra}"] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
-                    st.rerun()
-
-def rerun_safe():
-    """Forza un rerun compatible amb versiones nuevas/antiguas de Streamlit."""
-    try:
-        st.rerun()              # versiones nuevas
-    except Exception:
-        try:
-            st.experimental_rerun()  # versiones antiguas
-        except Exception:
-            pass
-
-def make_cloze(sentence: str, word: str) -> str:
-    """Devuelve la frase con la PRIMERA aparición exacta de 'word' sustituida por _____"""
-    return re.sub(rf"\b{re.escape(word)}\b", "_____", sentence, count=1)
-
-def generar_preguntas(n=10):
-    """Genera hasta n preguntas (enunciado cloze + 2 opciones: correcta y su parella)."""
-    preguntas = []
-    bolsa = []
-    for w, info in monosilabos.items():
-        if w in parelles and parelles[w] in monosilabos:
-            for ex in info["ejemplos"]:
-                # Usar solo ejemplos que contengan la palabra tal cual (con acentos)
-                if re.search(rf"\b{re.escape(w)}\b", ex):
-                    bolsa.append((w, ex))
-    random.shuffle(bolsa)
-
-    for w, ex in bolsa:
-        pareja = parelles[w]
-        preguntas.append({
-            "enunciado": make_cloze(ex, w),
-            "correcta": w,
-            "opciones": random.sample([w, pareja], k=2),  # baraja orden
-            "pareja": pareja,
-        })
-        if len(preguntas) >= n:
-            break
-    return preguntas
-    
-def generar_quiz(n=10):
-    """Adapta generar_preguntas() al formato que espera el Mini-quiz."""
-    preguntas = generar_preguntas(n)
-    return {
-        "preguntas": preguntas,
-        "respuestas": [None] * len(preguntas)
-    }
-
-# ==== GitHub helpers: guardar/leer ranking en scores.jsonl ====
-def _gh_headers():
-    return {
-        "Authorization": f"Bearer {st.secrets['GITHUB_TOKEN']}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-
-def _gh_file_url():
-    owner_repo = st.secrets["GITHUB_REPO"]
-    branch = st.secrets.get("GITHUB_BRANCH", "main")
-    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
-    return f"https://api.github.com/repos/{owner_repo}/contents/{path}?ref={branch}"
-
-def _gh_put_url():
-    owner_repo = st.secrets["GITHUB_REPO"]
-    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
-    return f"https://api.github.com/repos/{owner_repo}/contents/{path}"
-
-@st.cache_data(ttl=60)  # 👈 Cachea la lectura 60s (ajusta el ttl si quieres)
-def load_scores_from_github():
-    """
-    Lee el JSONL del repo.
-    Devuelve (scores:list, sha:str|None). Si no existe, ([], None).
-    """
-    try:
-        r = requests.get(_gh_file_url(), headers=_gh_headers(), timeout=10)
-        if r.status_code == 404:
-            return [], None  # fichero aún no creado
-        r.raise_for_status()
-        data = r.json()
-        content_b64 = data["content"]
-        sha = data["sha"]
-        content = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
-        scores = []
-        for line in content.splitlines():
-            if line.strip():
-                scores.append(json.loads(line))
-        return scores, sha
-    except Exception as e:
-        st.error(f"Error leyendo ránquing de GitHub: {e}")
-        return [], None
-
-def append_score_to_github(record: dict, max_retries=3):
-    """
-    Añade un registro al JSONL en GitHub con control de conflictos.
-    Flujo:
-      - GET: leer contenido y sha
-      - APPEND: añadir línea
-      - PUT: subir con sha (si existe)
-    """
-    for attempt in range(max_retries):
-        scores, sha = load_scores_from_github()
-        lines = [json.dumps(s, ensure_ascii=False) for s in scores]
-        lines.append(json.dumps(record, ensure_ascii=False))
-        new_content = "\n".join(lines) + "\n"
-
-        payload = {
-            "message": f"Add score: {record.get('nom','???')} {record.get('puntuacio','?')}/{record.get('total','?')}",
-            "content": base64.b64encode(new_content.encode("utf-8")).decode("utf-8"),
-            "branch": st.secrets.get("GITHUB_BRANCH", "main"),
-        }
-        if sha:
-            payload["sha"] = sha
-
-        try:
-            r = requests.put(_gh_put_url(), headers=_gh_headers(), json=payload, timeout=15)
-            if r.status_code in (200, 201):
-                # ✅ Guardado correcto → vaciamos la caché de lectura para ver el cambio al instante
-                st.cache_data.clear()
-                return True
-            if r.status_code == 409:  # conflicto: el fichero ha cambiado; reintentar
-                time.sleep(0.8)
-                continue
-            r.raise_for_status()
-            # si llega aquí sin excepción, lo consideramos OK por seguridad
-            st.cache_data.clear()
-            return True
-        except Exception as e:
-            if attempt == max_retries - 1:
-                st.error(f"No se ha podido guardar en el ránquing (GitHub): {e}")
-                return False
-            time.sleep(0.8)
-    return False
-
-# ===========================
-# Dades (els 15 monosílabs)
-# ===========================
-monosilabos = {
-    "sí": {"categoria": "adverbi d'afirmació",
-           "definicion": "Adverbi d'afirmació.",
-           "ejemplos": [
-               "Sí, vindré demà.",
-               "Va dir que sí a la proposta.",
-               "Sí que ho sabia.",
-               "I tant que sí!",
-               "Sí, estic d'acord amb tu.",
-               "Sí, és veritat."
-           ]},
-    "si": {"categoria": "conjunció condicional",
-           "definicion": "Conjunció condicional.",
-           "ejemplos": [
-               "Si plou, ens quedem a casa.",
-               "Si estudies, aprovaràs.",
-               "Si vols, t'ajude.",
-               "Si tens temps, vine demà.",
-               "Si no ho proves, mai ho sabràs."
-           ]},
-
-    "més": {"categoria": "quantificador/comparatiu",
-            "definicion": "Comparatiu de quantitat ('més = más').",
-            "ejemplos": [
-                "Vull més aigua.",
-                "Açò és més car que allò.",
-                "Necessitem més temps.",
-                "Cada dia estudie més hores.",
-                "Vol més cafè al matí.",
-                "Hi ha més gent a la plaça hui."
-            ]},
-    "mes": {"categoria": "nom (mes del calendari)",
-            "definicion": "Nom del calendari.",
-            "ejemplos": [
-                "El mes de juny fa calor.",
-                "Cada mes estalvie un poc.",
-                "Aquest mes començarem.",
-                "El pròxim mes hi haurà vacances.",
-                "És el mes més llarg de l'any."
-            ]},
-
-    "bé": {"categoria": "adverbi",
-           "definicion": "Adverbi ('bé = bien').",
-           "ejemplos": [
-               "Estic bé, gràcies.",
-               "Fes-ho bé, si us plau.",
-               "No m'ha paregut bé.",
-               "Treballa molt bé sota pressió.",
-               "Tot ha eixit bé al final."
-           ]},
-    "be": {"categoria": "nom (animal jove)",
-           "definicion": "Nom: 'corder', 'ovella jove'.",
-           "ejemplos": [
-               "Va comprar un be al mercat.",
-               "El be pastura al camp.",
-               "Han nascut dos bens.",
-               "El be balava sense parar.",
-               "El pastor cuidava un be malalt."
-           ]},
-
-    "déu": {"categoria": "nom propi (entitat divina)",
-            "definicion": "Nom: 'déu = dios'.",
-            "ejemplos": [
-                "Crec en un sol Déu.",
-                "El Déu dels antics era venerat.",
-                "La gent resava al seu Déu.",
-                "Van construir un temple dedicat a Déu.",
-                "Déu és omnipotent segons la fe."
-            ]},
-    "deu": {"categoria": "numeral / forma de 'deure'",
-            "definicion": "Nombre 'deu = diez' o forma de 'deure' (ha/han de).",
-            "ejemplos": [
-                "En té deu cromos.",
-                "Deu estudiar més per a aprovar.",
-                "Deu ser tard.",
-                "Han arribat deu persones.",
-                "Deu treballar molt per aconseguir-ho."
-            ]},
-
-    "és": {"categoria": "verb 'ser' (3a sing.)",
-           "definicion": "Forma verbal del verb 'ser'.",
-           "ejemplos": [
-               "Ell és professor.",
-               "La casa és gran.",
-               "És evident.",
-               "El llibre és interessant.",
-               "És massa tard per eixir.",
-               "És el meu millor amic."
-           ]},
-    "es": {"categoria": "pronom",
-           "definicion": "Pronom personal.",
-           "ejemplos": [
-               "Es pentina cada matí.",
-               "Es va caure al terra.",
-               "Es mira al mirall.",
-               "Es van saludar cordialment.",
-               "Es va vestir ràpidament."
-           ]},
-
-    "mà": {"categoria": "nom (part del cos)",
-           "definicion": "Part del cos ('mà = mano').",
-           "ejemplos": [
-               "La mà em fa mal.",
-               "Agafa'm de la mà.",
-               "Dóna'm la mà.",
-               "Alça la mà per preguntar.",
-               "Va escriure amb la mà esquerra."
-           ]},
-    "ma": {"categoria": "adjectiu possessiu",
-           "definicion": "Adjectiu possessiu ('ma = mi').",
-           "ejemplos": [
-               "Ma casa és la teua.",
-               "Ma mare treballa ací.",
-               "Ma germana vindrà.",
-               "Ma terra és especial per a mi.",
-               "Ma família viu al poble."
-           ]},
-
-    "món": {"categoria": "nom",
-            "definicion": "'Món = mundo'.",
-            "ejemplos": [
-                "El món és gran.",
-                "Viatjar pel món és enriquidor.",
-                "És el meu món.",
-                "El món canvia ràpidament.",
-                "Tot el món ho sap."
-            ]},
-    "mon": {"categoria": "possessiu arcaic",
-            "definicion": "Possessiu arcaic ('mon = mi').",
-            "ejemplos": [
-                "Mon pare treballa al camp.",
-                "Mon oncle viu lluny.",
-                "Mon cosí és menut.",
-                "Mon avi sempre conta històries.",
-                "Mon germà juga al futbol."
-            ]},
-
-    "pèl": {"categoria": "nom",
-            "definicion": "'Pèl = pelo, cabell' (filament).",
-            "ejemplos": [
-                "Tens un pèl al jersei.",
-                "El gat ha deixat pèl al sofà.",
-                "Se m'ha caigut un pèl.",
-                "El pèl és molt fi.",
-                "Els gossos muden el pèl a la primavera."
-            ]},
-    "pel": {"categoria": "contracció ('per el')",
-            "definicion": "Contracció de 'per el'.",
-            "ejemplos": [
-                "Passe pel carrer major.",
-                "Vaig pel camí antic.",
-                "Mira pel finestral.",
-                "Corre pel passadís.",
-                "Busca pel calaix."
-            ]},
-
-    "què": {"categoria": "pronom interrogatiu/exclamatiu",
-            "definicion": "Pronom interrogatiu/exclamatiu.",
-            "ejemplos": [
-                "Què vols menjar?",
-                "Mira què ha passat!",
-                "Què tal estàs?",
-                "Què fas ací?",
-                "Què vols dir exactament?"
-            ]},
-    "que": {"categoria": "conjunció / pronom relatiu",
-            "definicion": "Conjunció o pronom relatiu.",
-            "ejemplos": [
-                "Pensa que vindrà.",
-                "El llibre que llegisc és interessant.",
-                "Diuen que plourà.",
-                "Crec que tens raó.",
-                "És el projecte que esperàvem."
-            ]},
-
-    "sé": {"categoria": "verb 'saber' (1a sing.)",
-           "definicion": "Forma verbal de 'saber'.",
-           "ejemplos": [
-               "Jo sé la resposta.",
-               "No sé què dir-te.",
-               "Sé que tens raó.",
-               "No sé si vindrà.",
-               "Sé tocar la guitarra."
-           ]},
-    "se": {"categoria": "pronom",
-           "definicion": "Pronom personal.",
-           "ejemplos": [
-               "Se'n va anar de pressa.",
-               "Se sent feliç.",
-               "Se'n recorda sovint.",
-               "Se n'anà corrent.",
-               "Se sorprengué amb la notícia."
-           ]},
-
-    "sòl": {"categoria": "nom (terra ferma/suelo)",
-            "definicion": "'Sòl = suelo, terra ferma'.",
-            "ejemplos": [
-                "El sòl està mullat.",
-                "No poses això al sòl.",
-                "El sòl és irregular.",
-                "El sòl de la cuina és nou.",
-                "El sòl forestal és ric en nutrients."
-            ]},
-    "sol": {"categoria": "nom (astre) / adjectiu ('sol = a soles')",
-            "definicion": "Nom (astre 'sol') o adjectiu ('sol = solo').",
-            "ejemplos": [
-                "El sol brilla.",
-                "Estic sol a casa.",
-                "Prefereix estar sol.",
-                "El sol escalfa la terra.",
-                "El sol es pon a l'oest."
-            ]},
-
-    "són": {"categoria": "verb 'ser' (3a pl.)",
-            "definicion": "Forma verbal de 'ser' (3a persona plural).",
-            "ejemplos": [
-                "Ells són amics.",
-                "Les cases són grans.",
-                "Són ben educats.",
-                "Els meus pares són mestres.",
-                "Són de València."
-            ]},
-    "son": {"categoria": "nom (somnolència)",
-            "definicion": "'Son = sueño, ganes de dormir'.",
-            "ejemplos": [
-                "Tinc son.",
-                "El bebè té son.",
-                "Em fa son llegir.",
-                "Ell té molta son.",
-                "Després de dinar em ve son."
-            ]},
-
-    "té": {"categoria": "verb 'tindre' (3a sing.)",
-           "definicion": "Forma verbal de 'tindre'.",
-           "ejemplos": [
-               "Ella té un cotxe.",
-               "El xic té gana.",
-               "Té pressa.",
-               "Té tres gats a casa.",
-               "Té molta sort."
-           ]},
-    "te": {"categoria": "pronom / nom (beguda)",
-           "definicion": "Pronom ('a tu') o beguda ('te').",
-           "ejemplos": [
-               "Això és per a te.",
-               "Vull un te calent.",
-               "El te verd m'agrada.",
-               "Beu un te amb llet.",
-               "Regala'm un te d'herbes."
-           ]},
-
-    "ús": {"categoria": "nom",
-           "definicion": "'Ús = utilización' d'alguna cosa.",
-           "ejemplos": [
-               "L'ús del mòbil està regulat.",
-               "Fa ús del diccionari.",
-               "En limita l'ús.",
-               "L'ús de plàstic ha disminuït.",
-               "Estudia l'ús correcte dels verbs."
-           ]},
-    "us": {"categoria": "pronom (a vosaltres)",
-           "definicion": "Pronom personal ('a vosaltres').",
-           "ejemplos": [
-               "Us espere a la porta.",
-               "Ja us he vist.",
-               "Us ho explique després.",
-               "Us recomane aquest llibre.",
-               "Us vaig telefonar ahir."
-           ]},
-
-    "vós": {"categoria": "pronom de cortesia",
-            "definicion": "Pronom personal de cortesia.",
-            "ejemplos": [
-                "Vós sou benvingut.",
-                "Com esteu, vós?",
-                "Gràcies a vós.",
-                "Vós teniu la paraula.",
-                "Vós sereu recordat sempre."
-            ]},
-    "vos": {"categoria": "pronom (a vosaltres)",
-            "definicion": "Pronom personal ('a vosaltres').",
-            "ejemplos": [
-                "Vos estime molt.",
-                "Vos ajudaré en tot.",
-                "Vos ho diré demà.",
-                "Vos vaig veure ahir.",
-                "Vos vaig escriure un missatge."
-            ]},
-}
-
+# -------------------------
+# Datos base (monosíl·labs)
+# -------------------------
 pares = [
-    ("bé", "be"),
-    ("déu", "deu"),
-    ("és", "es"),
-    ("mà", "ma"),
-    ("més", "mes"),
-    ("món", "mon"),
-    ("pèl", "pel"),
-    ("què", "que"),
-    ("sé", "se"),
-    ("sòl", "sol"),
-    ("són", "son"),
-    ("té", "te"),
-    ("ús", "us"),
-    ("vós", "vos"),
-    ("sí", "si"),
+    ("bé", "be"), ("déu", "deu"), ("és", "es"), ("mà", "ma"),
+    ("més", "mes"), ("món", "mon"), ("pèl", "pel"), ("què", "que"),
+    ("sé", "se"), ("sòl", "sol"), ("són", "son"), ("té", "te"),
+    ("ús", "us"), ("vós", "vos"), ("sí", "si"),
 ]
 
 parelles = {}
@@ -848,82 +342,373 @@ for acent, sense in pares:
     parelles[acent] = sense
     parelles[sense] = acent
 
-# 4. AHORA SÍ podemos usar las funciones en el bloque try
-try:
-    logger.info("Iniciando aplicación...")
-    
-    # Inicializar estado de sesión
-    init_session_state()
-    
-    # Configuración de página
-    st.set_page_config(
-        page_title="📘 Monosíl·labs: accents diacrítics en valencià",
-        page_icon="📘",
-        layout="centered",
-        initial_sidebar_state="expanded",
-        menu_items={
-            'Get Help': None,
-            'Report a bug': None,
-            'About': None
+monosilabos = {
+    "sí": {
+        "categoria": "adverbi d'afirmació",
+        "definicion": "Adverbi d'afirmació.",
+        "ejemplos": [
+            "Sí, vindré demà.",
+            "Va dir que sí a la proposta.",
+            "Sí que ho sabia.",
+            "I tant que sí!",
+            "Sí, estic d'acord amb tu.",
+            "Sí, és veritat.",
+            "Sí, això és correcte.",
+            "Em va dir que sí sense dubtar.",
+            "Sí, ho faré ara mateix.",
+            "Sí, ho he comprovat diverses vegades."
+        ]
+    },
+    "si": {
+        "categoria": "conjunció condicional",
+        "definicion": "Conjunció condicional.",
+        "ejemplos": [
+            "Si plou, ens quedem a casa.",
+            "Si estudies, aprovaràs.",
+            "Si vols, t'ajude.",
+            "Si tens temps, vine demà.",
+            "Si no ho proves, mai ho sabràs.",
+            "Si véns, porta menjar.",
+            "Si truques, et contestaré.",
+            "Si estàs malalt, queda't a casa.",
+            "Si treballes dur, tindràs èxit.",
+            "Si cau, es farà mal."
+        ]
+    },
+
+    "més": {
+        "categoria": "quantificador/comparatiu",
+        "definicion": "Comparatiu de quantitat ('més = más').",
+        "ejemplos": [
+            "Vull més aigua.",
+            "Això és més car que allò.",
+            "Necessitem més temps.",
+            "Cada dia estudie més hores.",
+            "Vol més cafè al matí.",
+            "Hi ha més gent a la plaça hui.",
+            "M'agrada més aquest llibre.",
+            "Necessites més paciència.",
+            "Ell corre més que jo.",
+            "Menja més fruita per estar sa."
+        ]
+    },
+    "mes": {
+        "categoria": "nom (mes del calendari)",
+        "definicion": "Nom del calendari.",
+        "ejemplos": [
+            "El mes de juny fa calor.",
+            "Cada mes estalvie un poc.",
+            "Aquest mes començarem.",
+            "El pròxim mes hi haurà vacances.",
+            "És el mes més llarg de l'any.",
+            "El mes passat vam viatjar.",
+            "Cada mes canvien els preus.",
+            "Va nàixer el mes de maig.",
+            "Este mes hem treballat molt.",
+            "El mes d'agost sol ser calorós."
+        ]
+    },
+
+    "bé": {
+        "categoria": "adverbi",
+        "definicion": "Adverbi ('bé = bien').",
+        "ejemplos": [
+            "Estic bé, gràcies.",
+            "Fes-ho bé, si us plau.",
+            "No m'ha paregut bé.",
+            "Treballa molt bé sota pressió.",
+            "Tot ha eixit bé al final.",
+            "Mira-ho bé abans de signar.",
+            "Ho has entés bé?",
+            "Em sembla bé la teua idea.",
+            "Va parlar molt bé al congrés.",
+            "M'ho he passat bé avui."
+        ]
+    },
+    "be": {
+        "categoria": "nom (animal jove)",
+        "definicion": "Nom: 'corder', 'ovella jove'.",
+        "ejemplos": [
+            "Va comprar un be al mercat.",
+            "El be pastura al camp.",
+            "Han nascut dos bens.",
+            "El be balava sense parar.",
+            "El pastor cuidava un be malalt.",
+            "El be va créixer ràpid.",
+            "Els bens juguen a l'herba.",
+            "Un be va fugir de l'estable.",
+            "Ha venut els bens al mercat.",
+            "El be estava amb la mare."
+        ]
+    },
+}
+def search_suggestions(prefix: str):
+    inicial = prefix.strip().lower()[:1]
+    return sorted([w for w in monosilabos if w.lower().startswith(inicial)])
+# -------------------------
+# GitHub helpers (ranking)
+# -------------------------
+def _gh_headers():
+    return {
+        "Authorization": f"Bearer {st.secrets.get('GITHUB_TOKEN','')}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+    }
+
+def _gh_file_url():
+    owner_repo = st.secrets.get("GITHUB_REPO","")
+    branch = st.secrets.get("GITHUB_BRANCH", "main")
+    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
+    return f"https://api.github.com/repos/{owner_repo}/contents/{path}?ref={branch}"
+
+def _gh_put_url():
+    owner_repo = st.secrets.get("GITHUB_REPO","")
+    path = st.secrets.get("GITHUB_SCORES_PATH", "scores.jsonl")
+    return f"https://api.github.com/repos/{owner_repo}/contents/{path}"
+
+@st.cache_data(ttl=60)
+def load_scores_from_github():
+    try:
+        r = requests.get(_gh_file_url(), headers=_gh_headers(), timeout=10)
+        if r.status_code == 404:
+            return [], None
+        r.raise_for_status()
+        data = r.json()
+        content_b64 = data.get("content","")
+        sha = data.get("sha")
+        content = base64.b64decode(content_b64).decode("utf-8", errors="ignore")
+        scores = []
+        for line in content.splitlines():
+            if line.strip():
+                scores.append(json.loads(line))
+        return scores, sha
+    except Exception as e:
+        st.info(f"No s'ha pogut llegir el rànguing: {e}")
+        return [], None
+
+def append_score_to_github(record: dict):
+    try:
+        scores, sha = load_scores_from_github()
+        lines = [json.dumps(s, ensure_ascii=False) for s in scores]
+        lines.append(json.dumps(record, ensure_ascii=False))
+        new_content = "\n".join(lines) + "\n"
+        payload = {
+            "message": f"Add score: {record.get('nom','')} {record.get('puntuacio','?')}/{record.get('total','?')}",
+            "content": base64.b64encode(new_content.encode("utf-8")).decode("utf-8"),
+            "branch": st.secrets.get("GITHUB_BRANCH", "main"),
         }
-    )
+        if sha:
+            payload["sha"] = sha
+        r = requests.put(_gh_put_url(), headers=_gh_headers(), json=payload, timeout=15)
+        if r.status_code in (200, 201):
+            st.cache_data.clear()
+            return True
+        if r.status_code == 409:
+            time.sleep(0.8)
+            st.cache_data.clear()
+            return append_score_to_github(record)
+        r.raise_for_status()
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.info(f"No s'ha pogut guardar a GitHub: {e}")
+        return False
 
-    # ====== TEMA: inicializar y conmutar ANTES de inyectar CSS ======
-    with st.sidebar:
-        toggle_label = "Canvia a mode fosc" if not st.session_state.dark_mode else "Canvia a mode clar"
-        new_dark = st.toggle(toggle_label, value=st.session_state.dark_mode, key="__theme_toggle")
 
-    if new_dark != st.session_state.dark_mode:
-        st.session_state.dark_mode = new_dark
+# -------------------------
+# Utilidades varias
+# -------------------------
+def safe_rerun():
+    try:
         st.rerun()
-    # ================================================================
+    except Exception:
+        try:
+            st.experimental_rerun()
+        except Exception:
+            pass
 
-    # Inyectar CSS personalizado (UNA sola vez)
-    inject_custom_css()
+def display_word_info(paraula: str):
+    info = monosilabos[paraula]
 
-except Exception as e:
-    st.error(f"Error en la aplicación: {str(e)}")
-    logger.exception("Error en la aplicación")
-    raise
+    st.markdown(f"### — {paraula} —")
+    st.write("**Categoria:**", info.get("categoria", "—"))
+    st.write("**Definició:**", info["definicion"])
 
-# (Eliminado) — NO volver a inyectar CSS aquí
-# inject_custom_css()
+    # ejemplos (persistimos 2 por palabra)
+    key_ej = f"examples_{paraula}"
+    if key_ej not in st.session_state:
+        st.session_state[key_ej] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
+    ej = st.session_state[key_ej]
 
-col_title, col_theme = st.columns([4, 1])
+    st.write("**Exemples:**")
+    for ex in ej:
+        st.markdown("- " + ex)
 
-with col_title:
-    st.title("📘 Monosíl·labs: accents diacrítics en valencià")
-    st.caption("Consulta definicions, exemples i parelles")
-        
+    bloc = f"{paraula.capitalize()}\n{info['definicion']}\n" + "\n".join(f"- {e}" for e in ej)
+    st.code(bloc)
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.button("Copia", help="Selecciona el bloc i copia'l",
+                  key=f"copy_btn_{paraula}", type="primary")
+    with col2:
+        if st.button("Generar nous exemples", key=f"new_examples_{paraula}"):
+            st.session_state[key_ej] = random.sample(info["ejemplos"], k=min(2, len(info["ejemplos"])))
+            safe_rerun()
+
+    # contrast
+    if paraula in parelles:
+        altra = parelles[paraula]
+        if altra in monosilabos:
+            info2 = monosilabos[altra]
+            st.markdown(f"### — {altra} — *_(contrast)_*")
+            st.write("**Categoria:**", info2.get("categoria", "—"))
+            st.write("**Definició:**", info2["definicion"])
+
+            key_ej2 = f"examples_{altra}"
+            if key_ej2 not in st.session_state:
+                st.session_state[key_ej2] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
+            ej2 = st.session_state[key_ej2]
+
+            st.write("**Exemples:**")
+            for ex in ej2:
+                st.markdown("- " + ex)
+
+            bloc2 = f"{altra.capitalize()}\n{info2['definicion']}\n" + "\n".join(f"- {e}" for e in ej2)
+            st.code(bloc2)
+
+            col3, col4 = st.columns(2)
+            with col3:
+                st.button("Copia", help="Selecciona el bloc i copia'l",
+                          key=f"copy_btn_{altra}", type="primary")
+            with col4:
+                if st.button("Generar nous exemples", key=f"new_examples_{altra}"):
+                    st.session_state[key_ej2] = random.sample(info2["ejemplos"], k=min(2, len(info2["ejemplos"])))
+                    safe_rerun()
+
+
+# -------------------------
+# Quiz helpers
+# -------------------------
+def make_cloze(sentence: str, word: str) -> str:
+    return re.sub(rf"\b{re.escape(word)}\b", "_____", sentence, count=1)
+
+def generar_preguntas(n=10):
+    preguntas = []
+    bolsa = []
+    for w, info in monosilabos.items():
+        if w in parelles and parelles[w] in monosilabos:
+            for ex in info["ejemplos"]:
+                if re.search(rf"\b{re.escape(w)}\b", ex):
+                    bolsa.append((w, ex))
+    random.shuffle(bolsa)
+    for w, ex in bolsa[:n]:
+        pareja = parelles[w]
+        preguntas.append({
+            "enunciado": make_cloze(ex, w),
+            "correcta": w,
+            "opciones": random.sample([w, pareja], k=2),
+            "pareja": pareja,
+        })
+    return preguntas
+
+def generar_quiz(n=10):
+    preguntas = generar_preguntas(n)
+    return {"preguntas": preguntas, "respuestas": [None]*len(preguntas)}
+
+def show_quiz_progress(answered: int, total: int):
+    st.progress(answered/max(1,total))
+    st.caption(f"Respostes: {answered}/{total}")
+
+
+# -------------------------
+# Ranking (único render)
+# -------------------------
+def render_ranking():
+    """Render estable:
+       - Mode fosc -> st.dataframe (interactiu)
+       - Mode clar -> st.table (HTML, sense canvas negre)
+    """
+    if st.button("🔄 Actualitza rànguing", key="refresh_ranking_btn"):
+        st.cache_data.clear()
+        safe_rerun()
+
+    scores, _ = load_scores_from_github()
+    if not scores:
+        st.info("Encara no hi ha puntuacions.")
+        return
+
+    dark = st.session_state.get("dark_mode", False)
+
+    for n_preg in [5, 10, 20]:
+        subset = [s for s in scores if s.get("total") == n_preg]
+        if not subset:
+            continue
+
+        # ordenar per % i data
+        def pct(r): return (r.get("puntuacio", 0) / max(1, r.get("total", 1)))
+        def dt(s): 
+            try:
+                return datetime.strptime(s or "", "%Y-%m-%d %H:%M")
+            except Exception:
+                return datetime.min
+
+        subset_sorted = sorted(subset, key=lambda r: (pct(r), dt(r.get("data",""))), reverse=True)
+
+        rows = []
+        for r in subset_sorted:
+            num = r.get("puntuacio", 0)
+            den = max(1, r.get("total", 1))
+            rows.append({
+                "Nom": r.get("nom", "—"),
+                "Punts": f"{num}/{den}",
+                "%": round(100 * num / den),
+                "Data": r.get("data", "—"),
+            })
+        df = pd.DataFrame(rows)
+
+        with st.expander(f"Rànguing {n_preg} preguntes", expanded=(n_preg == 10)):
+            if dark:
+                st.dataframe(df, hide_index=True, use_container_width=True)
+            else:
+                styler = (
+                    df.style
+                      .set_properties(**{
+                          "background-color": "#ffffff",
+                          "color": "#111827",
+                          "border-color": "#e5e7eb",
+                          "border-width": "1px",
+                          "border-style": "solid"
+                      })
+                      .set_table_styles([
+                          {"selector": "thead th",
+                           "props": "background-color:#f8f9fa; color:#111827; border:1px solid #e5e7eb;"},
+                          {"selector": "tbody td",
+                           "props": "border:1px solid #e5e7eb;"},
+                          {"selector": "tbody tr:nth-child(even) td",
+                           "props": "background-color:#fcfcfc;"}
+                      ])
+                      .hide(axis="index")
+                )
+                st.table(styler)
+
+
+# -------------------------
+# UI superior
+# -------------------------
+st.title("📘 Monosíl·labs: accents diacrìtics en valencià")
 with st.expander("Saps què és un monosíl·lab?"):
     st.markdown(
         "**Monosíl·lab**: paraula d'una sola síl·laba.\n\n"
-        "**Accent diacrític**: accent que diferencia paraules homògrafes amb "
-        "significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
+        "**Accent diacrític**: accent que diferencia paraules homògrafes "
+        "amb significats o funcions gramaticals distintes (p. ex., **més** vs **mes**, **té** vs **te**)."
     )
 
-# ===========================
-# Estado de sesión
-# ===========================
-if "historial" not in st.session_state:
-    st.session_state.historial = []
-if "quiz" not in st.session_state:
-    st.session_state.quiz = None
-if "quiz_n" not in st.session_state:
-    st.session_state.quiz_n = 10  # valor per defecte
-if "scores" not in st.session_state:
-    st.session_state.scores = []  # llista de dicts: {"nom": "...", "puntuacio": x, "total": y, "data": "AAAA-MM-DD HH:MM"}
-
-# ===========================
-# Barra lateral (menú)
-# ===========================
-
-MENU_RANK = "🏆 Ránquing Quiz"
-
+# -------------------------
+# Menú lateral
+# -------------------------
 with st.sidebar:
     st.header("📋 Menú")
-
-       # El radio lee/escribe directamente en session_state["menu"]
     st.radio(
         "Acció",
         [
@@ -932,310 +717,152 @@ with st.sidebar:
             "📚 Llista detallada",
             "🕘 Historial",
             "📝 Mini-quiz",
-            MENU_RANK,
+            "🏆 Rànguing Quiz",
         ],
         key="menu",
     )
-
     st.divider()
     st.info(f"Versió: {datetime.now():%Y-%m-%d %H:%M:%S}")
 
-# Router: SIEMPRE después de construir el sidebar
-opcio = st.session_state["menu"]
+opcio = st.session_state.menu
 
-# ===========================
+# -------------------------
 # Vistas
-# ===========================
+# -------------------------
 if opcio == "🔍 Cerca un monosíl·lab":
     st.header("🔍 Cerca un monosíl·lab")
-    
-    col_input, col_btn = st.columns([3, 1])
-    
+    col_input, col_btn = st.columns([3,1])
+
     with col_input:
         paraula_input = st.text_input(
-            "Escriu el monosíl·lab (amb o sense accent):",
-            placeholder="Ex: més, que, sí...",
+            "Paraula:",
+            placeholder="Escriu el monosíl·lab (amb o sense accent)…",
             key="search_input"
         )
-    
     with col_btn:
-        st.write("")  # Espaciado para alinear
-        search_clicked = st.button("🔍 Cerca", key="search_btn")
+        st.write("")  # espai
+        search_clicked = st.button("Cerca", key="search_btn")
 
-    # Procesar búsqueda si se presionó Enter o el botón
     if paraula_input or search_clicked:
-        search_term = st.session_state.get("search_input", "").strip()
-        if search_term:
-            p = search_term.lower()
-            key = p if p in monosilabos else None
-
-            if key:
-                # Añadir al historial (evita duplicados consecutivos)
-                if not st.session_state.historial or st.session_state.historial[-1] != key:
-                    st.session_state.historial.append(key)
-
-                # Mostrar información
-                display_word_info(key)
-
+        p = st.session_state.get("search_input","").strip().lower()
+        if p in monosilabos:
+            if not st.session_state.historial or st.session_state.historial[-1] != p:
+                st.session_state.historial.append(p)
+            display_word_info(p)
+        else:
+            st.warning("No està en la base de dades. Revisa l'accent.")
+            sugerides = search_suggestions(p)
+            if sugerides:
+                st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(sugerides))
             else:
-                st.warning("No està en la base de dades. Revisa l'accent.")
-                # Mostrar pistas con colores
-                sugerides = search_suggestions(search_term)
-                if sugerides:
-                    st.markdown("**Pistes (mateixa lletra inicial):** " + ", ".join(color_word(w) for w in sugerides))
-                else:
-                    st.markdown("**Paraules disponibles:** " + ", ".join(color_word(w) for w in sorted(monosilabos.keys())))
+                st.markdown("**Paraules disponibles:** " + ", ".join(sorted(monosilabos.keys())))
 
 elif opcio == "🃏 Llista":
-    st.header("Monosíl·labs disponibles (en parelles)")
+    st.header("🃏 Llista en parelles")
     for acent, sense in pares:
-        st.markdown(f"- {color_word(acent)} / {color_word(sense)}")
+        st.markdown(f"- {acent} / {sense}")
 
 elif opcio == "📚 Llista detallada":
-    st.header("Monosíl·labs amb definicions i exemples")
+    st.header("📚 Llista detallada")
     for acent, sense in pares:
         for p in (acent, sense):
             if p in monosilabos:
                 info = monosilabos[p]
-                st.markdown(f"**— {color_word(p)} —**")
+                st.markdown(f"**— {p} —**")
                 st.write("**Categoria:**", info.get("categoria", "—"))
                 st.write("**Definició:**", info["definicion"])
                 st.write("**Exemples:**")
                 for ex in info["ejemplos"]:
                     st.markdown("- " + ex)
+                st.markdown("---")
 
 elif opcio == "🕘 Historial":
-    st.header("Historial de cerques")
+    st.header("🕘 Historial")
     if st.session_state.historial:
         for h in st.session_state.historial:
             st.write("-", h)
-        # Botón para limpiar historial (lo dejamos ya preparado)
         if st.button("🧹 Netejar historial"):
             st.session_state.historial.clear()
             st.success("Historial netejat.")
     else:
-        st.write("Encara no hi ha cerques.")
-        
+        st.info("Encara no hi ha cerques.")
+
 elif opcio == "📝 Mini-quiz":
     st.header("📝 Mini-quiz: tria la forma correcta")
-
-    # Estados necesarios
-    if "quiz" not in st.session_state:
-        st.session_state.quiz = None
-    if "quiz_n" not in st.session_state:
-        st.session_state.quiz_n = 10
-    if "scores" not in st.session_state:
-        st.session_state.scores = []
-    if "quiz_corrected" not in st.session_state:
-        st.session_state.quiz_corrected = False
-    if "last_score" not in st.session_state:
-        st.session_state.last_score = {}
-
-    quiz = st.session_state.quiz
-
-    # Selector y botón en la misma línea
-    col_sel, col_btn = st.columns([1, 1])
+    # selector i boto
+    col_sel, col_btn = st.columns([1,1])
     with col_sel:
         st.session_state.quiz_n = st.selectbox(
-            "Nombre de preguntes",
-            options=[5, 10, 20],
-            index=[5, 10, 20].index(st.session_state.get("quiz_n", 10)),
-            help="Tria quantes preguntes vols que tinga el quiz."
+            "Nombre de preguntes:",
+            options=[5,10,20],
+            index=[5,10,20].index(st.session_state.get("quiz_n",10)),
+            key="quiz_n_select"
         )
     with col_btn:
-        st.write("")  # Espaciado para alinear con el selectbox
-        if st.button("🎮 Nou quiz"):
+        st.write("")
+        if st.button("Nou quiz", type="primary"):
             st.session_state.quiz_corrected = False
             st.session_state.last_score = {}
-            quiz = generar_quiz(st.session_state.quiz_n)
-            st.session_state.quiz = quiz
-            st.rerun()
+            st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
+            safe_rerun()
 
+    quiz = st.session_state.get("quiz")
     if not quiz:
-        st.info("Prem **🎮 Nou quiz** per a començar.")
+        st.info("Prem **Nou quiz** per a començar.")
     else:
-        # BARRA DE PROGRESO
-        answered_count = sum(1 for r in quiz["respuestas"] if r is not None)
-        show_quiz_progress(1, len(quiz["preguntas"]), answered_count)
-        
-        # Renderizar preguntas con mejor diseño
-        for i, q in enumerate(quiz["preguntas"]):
-            st.markdown(f"""
-            <div class="quiz-question">
-                <h4>Pregunta {i+1}</h4>
-                <p style="font-size: 1.1em; margin-bottom: 1rem;">{q['enunciado']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Selectbox con mejor UX
-            current_answer = quiz["respuestas"][i]
-            seleccion = st.selectbox(
-                "Tria la forma correcta:",
-                options=["— Selecciona una opció —"] + q["opciones"],
-                index=(["— Selecciona una opció —"] + q["opciones"]).index(current_answer) if current_answer in q["opciones"] else 0,
-                key=f"sel_{i}",
-                help=f"Pregunta {i+1} de {len(quiz['preguntas'])}"
-            )
-            
-            if seleccion != "— Selecciona una opció —":
-                quiz["respuestas"][i] = seleccion
-            else:
-                quiz["respuestas"][i] = None
-            
-            st.markdown("---")
+        answered = sum(1 for r in quiz["respuestas"] if r is not None)
+        show_quiz_progress(answered, len(quiz["preguntas"]))
 
-        # Actualizar progreso tras cambios
-        answered_count = sum(1 for r in quiz["respuestas"] if r is not None)
-        
-        # Botón corregir con validación
-        can_correct = answered_count == len(quiz["preguntas"])
-        
-        if can_correct:
-            if st.button("✅ Corregir", key="btn_corregir", type="primary"):
-                correctes = sum(
-                    r == q["correcta"]
-                    for r, q in zip(quiz["respuestas"], quiz["preguntas"])
-                    if r
-                )
+        for i, q in enumerate(quiz["preguntas"]):
+            st.markdown(f'<div class="quiz-question"><h4>Pregunta {i+1}</h4>'
+                        f'<p style="margin:0.5rem 0 0.75rem 0">{q["enunciado"]}</p></div>',
+                        unsafe_allow_html=True)
+            opts = ["— Selecciona —"] + q["opciones"]
+            idx = opts.index(quiz["respuestas"][i]) if quiz["respuestas"][i] in q["opciones"] else 0
+            sel = st.selectbox("Tria la forma correcta:", options=opts, index=idx, key=f"sel_{i}")
+            quiz["respuestas"][i] = None if sel == "— Selecciona —" else sel
+            st.divider()
+
+        answered = sum(1 for r in quiz["respuestas"] if r is not None)
+        if answered == len(quiz["preguntas"]):
+            if st.button("✅ Corregir", type="primary"):
+                correctes = sum(r == q["correcta"] for r, q in zip(quiz["respuestas"], quiz["preguntas"]) if r)
                 total = len(quiz["preguntas"])
                 st.session_state.quiz_corrected = True
-                st.session_state.last_score = {
-                    "puntuacio": correctes,
-                    "total": total,
-                    "nom": st.session_state.get("last_score", {}).get("nom", ""),
-                }
-                st.rerun()
+                st.session_state.last_score = {"puntuacio": correctes, "total": total, "nom": st.session_state.last_score.get("nom","")}
+                safe_rerun()
         else:
-            st.warning(f"⚠️ Respon totes les preguntes per corregir. ({answered_count}/{len(quiz['preguntas'])} respostes)")
+            st.warning(f"Respon totes les preguntes ({answered}/{len(quiz['preguntas'])}).")
 
-        # -------- Panel post-corrección (estable en rerun) --------
         if st.session_state.get("quiz_corrected"):
             score = st.session_state.get("last_score", {})
-            correctes = score.get("puntuacio", 0)
-            total = score.get("total", 0)
+            st.success(f"Has encertat {score.get('puntuacio',0)}/{score.get('total',0)}")
+            st.session_state.last_score["nom"] = st.text_input("El teu nom (opcional):", value=st.session_state.last_score.get("nom",""))
 
-            st.success(f"Has encertat {correctes}/{total}")
-
-            from datetime import datetime
-            st.session_state.last_score["nom"] = st.text_input(
-                "El teu nom (opcional):",
-                value=st.session_state.last_score.get("nom", ""),
-                key="inp_nom_quiz"
-            )
-            data_str = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-            colA, colB, colC = st.columns([1, 1, 1])
-
+            colA, colB, colC = st.columns(3)
             with colA:
-                if st.button("💾 Guardar ránquing", key="btn_save_rank"):
+                if st.button("💾 Guardar rànguing"):
                     record = {
-                        "nom": st.session_state.last_score.get("nom", ""),
-                        "puntuacio": correctes,
-                        "total": total,
-                        "data": data_str,
+                        "nom": st.session_state.last_score.get("nom",""),
+                        "puntuacio": score.get("puntuacio",0),
+                        "total": score.get("total",0),
+                        "data": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     }
-                    if "scores" not in st.session_state:
-                        st.session_state.scores = []
                     st.session_state.scores.append(record)
-                    st.success("Resultat guardat en la sessió.")
-                    try:
-                        if "append_score_to_github" in globals():
-                            ok = append_score_to_github(record)
-                            if ok:
-                                st.success("Ránquing a GitHub actualitzat.")
-                            else:
-                                st.info("No s'ha pogut guardar a GitHub.")
-                    except Exception as e:
-                        st.info(f"No s'ha pogut guardar a GitHub: {e}")
-
+                    ok = append_score_to_github(record)
+                    if ok:
+                        st.success("Rànguing a GitHub actualitzat.")
             with colB:
-                if st.button("🏆 Veure ránquing", key="btn_go_rank"):
-                    st.session_state["menu"] = MENU_RANK
-                    st.rerun()
-
-            with colC:
-                if st.button("📝 Nou quiz", key="btn_new_quiz_after"):
+                if st.button("📝 Nou quiz"):
                     st.session_state.quiz_corrected = False
                     st.session_state.last_score = {}
                     st.session_state.quiz = generar_quiz(st.session_state.quiz_n)
-                    st.rerun()
+                    safe_rerun()
+            with colC:
+                if st.button("🏆 Veure rànguing"):
+                    st.session_state.menu = "🏆 Rànguing Quiz"
+                    safe_rerun()
 
-elif opcio == "🏆 Ránquing Quiz":
-    import pandas as pd
-    from datetime import datetime
-
-    st.header("🏆 Ránquing Quiz")
-
-    # Botón de refresco (limpia caché y relee)
-    if st.button("🔄 Actualitza ránquing ara"):
-        st.cache_data.clear()
-        st.rerun()
-
-    # Leer datos
-    try:
-        scores, _ = load_scores_from_github()
-    except:
-        scores = []
-
-    if not scores:
-        st.info("Encara no hi ha puntuacions al ránquing.")
-    else:
-        # Separar por número de preguntas
-        scores_5 = [s for s in scores if s.get("total") == 5]
-        scores_10 = [s for s in scores if s.get("total") == 10]
-        scores_20 = [s for s in scores if s.get("total") == 20]
-
-        # Función para ordenar y crear DataFrame
-        def create_ranking_df(scores_list):
-            def pct(r):
-                den = max(1, r.get("total", 1))
-                return (r.get("puntuacio", 0) / den)
-
-            def parse_dt(s: str):
-                try:
-                    return datetime.strptime(s, "%Y-%m-%d %H:%M")
-                except Exception:
-                    return datetime.min
-
-            scores_sorted = sorted(
-                scores_list,
-                key=lambda r: (pct(r), parse_dt(r.get("data", ""))),
-                reverse=True
-            )
-
-            rows = []
-            for r in scores_sorted:
-                num = r.get("puntuacio", 0)
-                den = max(1, r.get("total", 1))
-                rows.append({
-                    "Nom": r.get("nom", "—"),
-                    "Punts": f"{num}/{den}",
-                    "%": round(100 * num / den),
-                    "Data": r.get("data", "—"),
-                })
-
-            return pd.DataFrame(rows)
-
-        # Crear tabs para cada ranking
-        tab1, tab2, tab3 = st.tabs(["5 preguntes", "10 preguntes", "20 preguntes"])
-        
-        with tab1:
-            if scores_5:
-                df_5 = create_ranking_df(scores_5)
-                render_ranking_table(df_5, 360)
-            else:
-                st.info("Encara no hi ha puntuacions per a 5 preguntes.")
-        
-        with tab2:
-            if scores_10:
-                df_10 = create_ranking_df(scores_10)
-                render_ranking_table(df_10, 360)
-            else:
-                st.info("Encara no hi ha puntuacions per a 10 preguntes.")
-                
-        with tab3:
-            if scores_20:
-                df_20 = create_ranking_df(scores_20)
-                render_ranking_table(df_20, 360)
-            else:
-                st.info("Encara no hi ha puntuacions per a 20 preguntes.")
+elif opcio == "🏆 Rànguing Quiz":
+    st.header("🏆 Rànguing Quiz")
+    render_ranking()
